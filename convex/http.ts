@@ -245,7 +245,8 @@ const lookupKnowledgeTool = httpAction(async (ctx, request) => {
   const args = call?.args ?? {};
   const toolCallId = call?.id ?? "";
 
-  const businessId = asString(args.businessId) as Id<"businesses"> | undefined;
+  const url = new URL(request.url);
+  const businessId = (url.searchParams.get("bid") ?? asString(args.businessId)) as Id<"businesses"> | undefined;
   const query = asString(args.query) ?? "";
 
   if (!businessId || !query) {
@@ -285,7 +286,8 @@ const checkAvailabilityTool = httpAction(async (ctx, request) => {
   const args = call?.args ?? {};
   const toolCallId = call?.id ?? "";
 
-  const businessId = asString(args.businessId) as Id<"businesses"> | undefined;
+  const url = new URL(request.url);
+  const businessId = (url.searchParams.get("bid") ?? asString(args.businessId)) as Id<"businesses"> | undefined;
   const date = asString(args.date) ?? new Date().toISOString().slice(0, 10);
 
   if (!businessId) {
@@ -325,7 +327,8 @@ const bookAppointmentTool = httpAction(async (ctx, request) => {
   const args = call?.args ?? {};
   const toolCallId = call?.id ?? "";
 
-  const businessId = asString(args.businessId) as Id<"businesses"> | undefined;
+  const url = new URL(request.url);
+  const businessId = (url.searchParams.get("bid") ?? asString(args.businessId)) as Id<"businesses"> | undefined;
   const slot = asString(args.slot) ?? "";
   const customerName = asString(args.customerName) ?? "";
   const contact = asString(args.contact) ?? "";

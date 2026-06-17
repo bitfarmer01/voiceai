@@ -83,7 +83,9 @@ export default function TryPage() {
       activeCallIdRef.current = callId;
       const assistant = buildAssistant(preset, pipeline, {
         webhookUrl: WEBHOOK_URL,
+        toolBaseUrl: SITE_URL || undefined,
         secret: PUBLIC_KEY,
+        businessId: business._id,
       });
       const vapiCallId = await call.start(assistant);
       if (vapiCallId) {
