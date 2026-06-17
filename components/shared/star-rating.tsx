@@ -3,6 +3,7 @@
 import * as React from "react";
 import { Star } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 export function StarRating({
   value,
@@ -18,14 +19,15 @@ export function StarRating({
   return (
     <div className="flex items-center gap-1">
       {[1, 2, 3, 4, 5].map((n) => (
-        <button
+        <Button
           key={n}
           type="button"
+          variant="ghost"
+          size="icon-sm"
           disabled={disabled}
           onClick={() => onChange(n)}
           onMouseEnter={() => setHover(n)}
           onMouseLeave={() => setHover(0)}
-          className="rounded p-0.5 disabled:cursor-not-allowed disabled:opacity-60"
           aria-label={`Rate ${n} star${n === 1 ? "" : "s"}`}
         >
           <Star
@@ -36,7 +38,7 @@ export function StarRating({
                 : "fill-none text-muted-foreground",
             )}
           />
-        </button>
+        </Button>
       ))}
     </div>
   );

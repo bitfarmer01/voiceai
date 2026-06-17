@@ -6,6 +6,7 @@ import Link from "next/link";
 import { api } from "@/convex/_generated/api";
 import { formatUsd, formatDuration } from "@/lib/format";
 import { BudgetMeter } from "@/components/shared/budget-meter";
+import { EmptyState } from "@/components/states/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useBudgetState } from "@/lib/data";
 import { cn } from "@/lib/utils";
@@ -42,7 +43,7 @@ function AdminDashboard() {
   return (
     <div className="mx-auto w-full max-w-5xl px-4 py-10 sm:px-6">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold tracking-tight">Admin</h1>
+        <h1 className="text-2xl font-bold">Admin</h1>
         <p className="mt-1 text-sm text-muted-foreground">Spend dashboard · private</p>
       </div>
 
@@ -60,14 +61,18 @@ function AdminDashboard() {
             ))}
           </div>
         ) : calls.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No calls yet.</p>
+          <EmptyState
+            title="No calls recorded"
+            description="Call data appears here once the demo has been used."
+            action={{ label: "Make a call", href: "/try" }}
+          />
         ) : (
           <div className="space-y-2">
             {calls.map((c) => (
               <Link
                 key={c.id}
                 href={`/calls/${c.id}`}
-                className="flex items-center gap-3 rounded-lg border p-3 text-sm hover:border-primary/40 transition-colors"
+                className="flex items-center gap-3 rounded-lg border p-3 text-sm hover:border-primary/40"
               >
                 <span className={cn("size-2 shrink-0 rounded-full", OUTCOME_DOT[c.outcome])} />
                 <span className="min-w-0 flex-1 truncate font-medium">{c.businessName}</span>

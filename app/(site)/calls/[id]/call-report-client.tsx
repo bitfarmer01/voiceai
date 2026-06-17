@@ -15,6 +15,7 @@ import { StarRating } from "@/components/shared/star-rating";
 import { EmptyState } from "@/components/states/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { useVisitorKey } from "@/lib/hooks/use-visitor-key";
 import type { SpanKind, TranscriptTurn } from "@/lib/types";
 
@@ -187,7 +188,7 @@ export function CallReportClient({ id }: { id: string }) {
           </section>
 
           {/* Booking */}
-          {booking && (
+          {booking != null && (
             <section className="rounded-xl border bg-card p-5">
               <div className="mb-3 flex items-center gap-2">
                 <Calendar className="size-4 text-success" />
@@ -196,7 +197,10 @@ export function CallReportClient({ id }: { id: string }) {
               <pre className="overflow-auto rounded-lg bg-secondary p-3 font-mono text-xs text-foreground">
                 {JSON.stringify(booking, null, 2)}
               </pre>
-              <button
+              <Button
+                variant="link"
+                size="sm"
+                className="mt-3 h-auto gap-1.5 p-0 text-xs"
                 onClick={() => {
                   const blob = new Blob([JSON.stringify(booking, null, 2)], { type: "application/json" });
                   const a = document.createElement("a");
@@ -204,11 +208,10 @@ export function CallReportClient({ id }: { id: string }) {
                   a.download = `booking-${id}.json`;
                   a.click();
                 }}
-                className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
               >
                 <Download className="size-3.5" />
                 Download booking
-              </button>
+              </Button>
             </section>
           )}
 

@@ -66,7 +66,7 @@ export default function EvalsPage() {
       <div className="mb-8 flex items-start gap-3">
         <FlaskConical className="mt-0.5 size-6 text-primary" />
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Eval Harness</h1>
+          <h1 className="text-2xl font-bold">Eval Harness</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Scripted scenarios scored for grounding, task success, and regressions.
           </p>

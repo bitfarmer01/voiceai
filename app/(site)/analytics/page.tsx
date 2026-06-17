@@ -51,7 +51,7 @@ function KpiCard({
     <div className="rounded-xl border bg-card p-5">
       <div className="flex items-center gap-2 text-muted-foreground">
         <Icon className="size-4" />
-        <span className="text-xs font-medium uppercase tracking-wider">{label}</span>
+        <span className="text-xs font-medium uppercase">{label}</span>
       </div>
       <p className="mt-2 font-mono text-2xl font-bold tabular-nums">{value}</p>
       {sub && <p className="mt-0.5 font-mono text-xs text-muted-foreground">{sub}</p>}
@@ -79,7 +79,7 @@ export default function AnalyticsPage() {
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold tracking-tight">Analytics</h1>
+        <h1 className="text-2xl font-bold">Analytics</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Aggregated from the last {calls.length} calls
         </p>
@@ -127,12 +127,6 @@ export default function AnalyticsPage() {
           <h2 className="mb-4 text-sm font-semibold">Calls over time</h2>
           <ResponsiveContainer width="100%" height={220}>
             <AreaChart data={timeSeries} margin={{ top: 4, right: 16, bottom: 0, left: 0 }}>
-              <defs>
-                <linearGradient id="callGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.25} />
-                  <stop offset="95%" stopColor="var(--primary)" stopOpacity={0} />
-                </linearGradient>
-              </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
               <XAxis
                 dataKey="day"
@@ -157,7 +151,8 @@ export default function AnalyticsPage() {
                 dataKey="count"
                 name="Calls"
                 stroke="var(--primary)"
-                fill="url(#callGrad)"
+                fill="var(--primary)"
+                fillOpacity={0.12}
                 strokeWidth={2}
                 isAnimationActive={false}
               />

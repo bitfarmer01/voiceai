@@ -5,6 +5,7 @@ import { ArrowUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatMs, formatUsd } from "@/lib/format";
 import { useProviderStats } from "@/lib/data";
+import { Button } from "@/components/ui/button";
 import { LatencyCostChart } from "@/components/shared/latency-cost-chart";
 import { ProviderChip } from "@/components/shared/provider-chip";
 import { EmptyState } from "@/components/states/empty-state";
@@ -42,11 +43,12 @@ function SortableTable({
   };
 
   const Th = ({ k, label }: { k: SortKey; label: string }) => (
-    <TableHead
-      className="cursor-pointer select-none"
-      onClick={() => toggle(k)}
-    >
-      <span className="inline-flex items-center gap-1">
+    <TableHead className="p-0">
+      <Button
+        variant="ghost"
+        className="h-full w-full justify-start rounded-none px-4 py-3 font-medium"
+        onClick={() => toggle(k)}
+      >
         {label}
         <ArrowUpDown
           className={cn(
@@ -54,12 +56,12 @@ function SortableTable({
             sort === k ? "text-foreground" : "text-muted-foreground/40",
           )}
         />
-      </span>
+      </Button>
     </TableHead>
   );
 
   if (sorted.length === 0) {
-    return <EmptyState title="No data yet" description="Call data appears here after your first call." />;
+    return <EmptyState title="No data yet" description="Call data appears here after your first call." action={{ label: "Make a call", href: "/try" }} />;
   }
 
   return (
@@ -98,7 +100,7 @@ export default function LeaderboardPage() {
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold tracking-tight">Provider Leaderboard</h1>
+        <h1 className="text-2xl font-bold">Provider Leaderboard</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Latency × cost × quality — measured from real calls
         </p>

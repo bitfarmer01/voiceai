@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { formatUsd, formatDuration } from "@/lib/format";
 import { EmptyState } from "@/components/states/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
 import type { CallOutcome } from "@/lib/types";
 
 const OUTCOME_DOT: Record<CallOutcome, string> = {
@@ -39,18 +40,17 @@ export default function CallsPage() {
     <div className="mx-auto w-full max-w-5xl px-4 py-10 sm:px-6">
       <div className="mb-8 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Recent Calls</h1>
+          <h1 className="text-2xl font-bold">Recent Calls</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Live anonymized feed — no PII stored
           </p>
         </div>
-        <Link
-          href="/try"
-          className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
-        >
-          <Phone className="size-4" />
-          Start a call
-        </Link>
+        <Button asChild>
+          <Link href="/try">
+            <Phone className="size-4" />
+            Start a call
+          </Link>
+        </Button>
       </div>
 
       {calls === undefined ? (
@@ -63,6 +63,7 @@ export default function CallsPage() {
         <EmptyState
           title="No calls yet"
           description="Be the first to try the receptionist. Anonymized call summaries appear here in realtime."
+          action={{ label: "Start a call", href: "/try" }}
         />
       ) : (
         <div className="space-y-3">
@@ -70,7 +71,7 @@ export default function CallsPage() {
             <Link
               key={c.id}
               href={`/calls/${c.id}`}
-              className="group flex items-center gap-4 rounded-xl border bg-card p-4 transition-colors hover:border-primary/40"
+              className="group flex items-center gap-4 rounded-xl border bg-card p-4 hover:border-primary/40"
             >
               <span className={cn("mt-0.5 size-2.5 shrink-0 rounded-full", OUTCOME_DOT[c.outcome])} />
 
