@@ -8,7 +8,6 @@ Review plan.md and update @memory.md as a feature is built
 
 ensure that you always work within the available dependencies.  Check if a dependency is available before using it.  only if not available, propose to install. 
 
-Always ask the user before running any npm commands.
 
 <!-- BEGIN:ui-component-rules -->
 # UI Component Rules

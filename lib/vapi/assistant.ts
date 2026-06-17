@@ -120,6 +120,9 @@ export function buildAssistant(
   pipeline: PipelineSelection,
   opts?: { webhookUrl?: string; toolBaseUrl?: string; secret?: string; businessId?: string },
 ) {
+  if (opts?.toolBaseUrl && !opts?.businessId) {
+    console.warn("buildAssistant: toolBaseUrl set but businessId is missing — tools will not be attached");
+  }
   const tools =
     opts?.toolBaseUrl && opts?.businessId
       ? buildTools(opts.toolBaseUrl, opts.businessId, opts.secret)
@@ -162,9 +165,9 @@ export function buildAssistantFromConvexBusiness(
     `Services: ${biz.services.join(", ")}`,
     `Policies: ${biz.policies.join("; ")}`,
     `Availability: ${biz.availability}`,
-    ``,
-    `FAQ and policies:`,
-    ...biz.chunks.map((c) => `- ${c.text}`),
+    ...(biz.chunks.length > 0
+      ? [``, `FAQ and policies:`, ...biz.chunks.map((c) => `- ${c.text}`)]
+      : []),
   ].join("\n");
 
   const tools =

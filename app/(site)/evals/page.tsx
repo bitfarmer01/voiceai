@@ -40,7 +40,6 @@ const STUB_RUNS = [
 
 export default function EvalsPage() {
   const latestRun = STUB_RUNS[0];
-  const passCount = STUB_RUNS.filter((r) => r.status === "pass").length;
   const failCount = STUB_RUNS.filter((r) => r.status === "fail").length;
   const hasRegression = failCount > 0;
 
@@ -115,7 +114,7 @@ function KpiTile({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-lg border bg-card p-4">
       <p className="text-xs font-medium text-muted-foreground">{label}</p>
-      <p className="mt-2 text-2xl font-bold text-balance">{value}</p>
+      <p className="mt-2 text-2xl font-bold tabular-nums">{value}</p>
     </div>
   );
 }

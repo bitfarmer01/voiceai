@@ -9,6 +9,23 @@ function formatIcsDate(ms: number): string {
   return new Date(ms).toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
 }
 
+// RFC 5545 §3.3.11 TEXT escaping: \, comma, semicolon must be escaped.
+// Newlines become literal \n; bare CRs are stripped to prevent property injection.
+function escapeIcsText(s: string): string {
+  return s
+    .replace(/\r/g, "")
+    .replace(/\\/g, "\\\\")
+    .replace(/,/g, "\\,")
+    .replace(/;/g, "\\;")
+    .replace(/\n/g, "\\n");
+}
+
+// Strip control characters (including CR/LF) from single-line ICS property values
+// to prevent header injection via user-supplied strings.
+function sanitizeIcsLine(s: string): string {
+  return s.replace(/[\r\n]/g, " ").trim();
+}
+
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ leadId: string }> },
@@ -23,24 +40,28 @@ export async function GET(
   }
 
   const now = Date.now();
-  const startMs = lead.createdAt + 60 * 60 * 1000; // default: 1h after booking
-  const endMs = startMs + 60 * 60 * 1000; // 1h duration
+  // Use the booked slot when available; fall back to 1h after lead creation.
+  const startMs = lead.slot
+    ? new Date(lead.slot.includes("T") ? lead.slot : lead.slot.replace(" ", "T") + ":00Z").getTime()
+    : lead.createdAt + 60 * 60 * 1000;
+  const endMs = startMs + 60 * 60 * 1000;
 
-  const ics = [
-    "BEGIN:VCALENDAR",
-    "VERSION:2.0",
-    "PRODID:-//Receptionist AI//EN",
-    "BEGIN:VEVENT",
-    `UID:${leadId}@receptionist.ai`,
-    `DTSTAMP:${formatIcsDate(now)}`,
-    `DTSTART:${formatIcsDate(startMs)}`,
-    `DTEND:${formatIcsDate(endMs)}`,
-    `SUMMARY:Appointment at ${lead.businessName}`,
-    `DESCRIPTION:${lead.request.replace(/\n/g, "\\n")}`,
-    `CONTACT:${lead.contact}`,
-    "END:VEVENT",
-    "END:VCALENDAR",
-  ].join("\r\n");
+  const ics =
+    [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//Receptionist AI//EN",
+      "BEGIN:VEVENT",
+      `UID:${leadId}@receptionist.ai`,
+      `DTSTAMP:${formatIcsDate(now)}`,
+      `DTSTART:${formatIcsDate(startMs)}`,
+      `DTEND:${formatIcsDate(endMs)}`,
+      `SUMMARY:Appointment at ${sanitizeIcsLine(lead.businessName)}`,
+      `DESCRIPTION:${escapeIcsText(lead.request)}`,
+      `CONTACT:${sanitizeIcsLine(lead.contact)}`,
+      "END:VEVENT",
+      "END:VCALENDAR",
+    ].join("\r\n") + "\r\n";
 
   return new NextResponse(ics, {
     status: 200,
