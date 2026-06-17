@@ -84,5 +84,6 @@ describe("engineReportToRecordArgs", () => {
     expect(args.ttfwMs).toBe(1150); // from componentLatencyMs.ttfw
     expect(args.summary).toBe(report.summary);
     expect(args.successEval).toBe(true);
+    expect(args.languages).toBeUndefined();
   });
 });

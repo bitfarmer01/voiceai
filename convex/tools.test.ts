@@ -67,6 +67,25 @@ describe("book_appointment", () => {
     const t = convexTest(schema, modules);
     const businessId = await seededBusinessId(t);
 
+    // Give the business a LIVE call so bookAppointment exercises its live-call
+    // selection branch (the production path), not the ended-call fallback.
+    const liveCallId = await t.run(async (ctx) =>
+      ctx.db.insert("calls", {
+        sessionId: "test_live_session",
+        businessId,
+        businessName: "Test Business",
+        status: "live",
+        startedAt: 1781611200000,
+        durationSec: 0,
+        costUsd: 0,
+        costBreakdown: { stt: 0, llm: 0, tts: 0, platform: 0 },
+        sttProvider: "Deepgram Flux",
+        ttsProvider: "Cartesia Sonic-3",
+        llmProvider: "GPT-4o mini",
+        languages: ["en"],
+      }),
+    );
+
     const first = await t.mutation(internal.tools.bookAppointment, {
       businessId,
       slot: "2026-06-15T09:00:00.000Z",
@@ -76,6 +95,9 @@ describe("book_appointment", () => {
     });
     expect(first.booked).toBe(true);
     expect(first.confirmationId).not.toBe("");
+
+    const liveCall = await t.run((ctx) => ctx.db.get(liveCallId));
+    expect(liveCall?.outcome).toBe("booked");
 
     const second = await t.mutation(internal.tools.bookAppointment, {
       businessId,
