@@ -12,6 +12,9 @@ import { useBudgetState } from "@/lib/data";
 import { useVisitorKey } from "@/lib/hooks/use-visitor-key";
 import { DEFAULT_PIPELINE, buildAssistant, buildAssistantFromConvexBusiness, type PipelineSelection } from "@/lib/vapi/assistant";
 import { DocUploader, type UploadState } from "@/components/try/doc-uploader";
+import { BusinessForm } from "@/components/try/business-form";
+import { TextPaste } from "@/components/try/text-paste";
+import { UrlInput } from "@/components/try/url-input";
 import { useVapiCall } from "@/lib/vapi/use-vapi-call";
 
 import { AgentStage } from "@/components/try/agent-stage";
@@ -60,7 +63,8 @@ export default function TryPage() {
   const businesses = useQuery(api.businesses.listPresets);
   const guard = useQuery(api.guard.canStartCall, visitorKey ? { visitorKey } : "skip");
 
-  const [mode, setMode] = React.useState<"preset" | "upload">("preset");
+  const [mode, setMode] = React.useState<"preset" | "custom">("preset");
+  const [customSource, setCustomSource] = React.useState<"upload" | "paste" | "link" | "form">("upload");
   const [uploadState, setUploadState] = React.useState<UploadState>({ status: "idle" });
 
   const startCallM = useMutation(api.calls.startCall);
@@ -68,6 +72,9 @@ export default function TryPage() {
   const endCallM = useMutation(api.lifecycle.endCall);
   const generateUploadUrlM = useMutation(api.businesses.generateUploadUrl);
   const ingestDocumentA = useAction(api.ingest.ingestDocument);
+  const ingestTextA = useAction(api.sources.ingestText);
+  const ingestUrlA = useAction(api.sources.ingestUrl);
+  const generateFromFormA = useAction(api.sources.generateFromForm);
   const uploadedBizQ = useQuery(
     api.businesses.getWithChunks,
     uploadState.status === "ready" ? { businessId: uploadState.businessId as any } : "skip",
@@ -113,11 +120,63 @@ export default function TryPage() {
     [generateUploadUrlM, ingestDocumentA, sessionId],
   );
 
+  const handlePasteText = React.useCallback(
+    async (text: string) => {
+      setUploadState({ status: "analyzing" });
+      try {
+        const { businessId } = await ingestTextA({ sessionId, text });
+        setUploadState({ status: "ready", businessId, fileName: "Pasted text" });
+      } catch (e) {
+        setUploadState({
+          status: "error",
+          message:
+            e instanceof Error ? e.message : "Couldn't process that text — try another source.",
+        });
+      }
+    },
+    [ingestTextA, sessionId],
+  );
+
+  const handleIngestUrl = React.useCallback(
+    async (url: string) => {
+      setUploadState({ status: "analyzing" });
+      try {
+        const { businessId } = await ingestUrlA({ sessionId, url });
+        const domain = new URL(url).hostname;
+        setUploadState({ status: "ready", businessId, fileName: domain });
+      } catch (e) {
+        setUploadState({
+          status: "error",
+          message:
+            e instanceof Error ? e.message : "Couldn't fetch that URL — try pasting text instead.",
+        });
+      }
+    },
+    [ingestUrlA, sessionId],
+  );
+
+  const handleGenerateFromForm = React.useCallback(
+    async (data: { companyName: string; industry: string; description: string }) => {
+      setUploadState({ status: "analyzing" });
+      try {
+        const { businessId } = await generateFromFormA({ sessionId, ...data });
+        setUploadState({ status: "ready", businessId, fileName: data.companyName });
+      } catch (e) {
+        setUploadState({
+          status: "error",
+          message:
+            e instanceof Error ? e.message : "Couldn't generate guidelines — try again.",
+        });
+      }
+    },
+    [generateFromFormA, sessionId],
+  );
+
   const beginCall = React.useCallback(async () => {
     setStartError(null);
     if (!visitorKey) return;
 
-    if (mode === "upload") {
+    if (mode !== "preset") {
       if (!uploadedBizQ || uploadState.status !== "ready") return;
       try {
         const callId = await startCallM({
@@ -192,6 +251,13 @@ export default function TryPage() {
     call,
     attachVapiIdM,
     endCallM,
+    customSource,
+    handlePasteText,
+    handleIngestUrl,
+    handleGenerateFromForm,
+    ingestTextA,
+    ingestUrlA,
+    generateFromFormA,
   ]);
 
   React.useEffect(() => {
@@ -231,7 +297,7 @@ export default function TryPage() {
         {/* LEFT — Setup */}
         <div className="space-y-4">
           <section className="rounded-xl border bg-card p-4">
-            {/* Mode toggle */}
+            {/* Top toggle: Presets | Custom */}
             <div className="mb-3 flex rounded-lg border p-0.5">
               <button
                 onClick={() => setMode("preset")}
@@ -245,17 +311,40 @@ export default function TryPage() {
                 Presets
               </button>
               <button
-                onClick={() => setMode("upload")}
+                onClick={() => setMode("custom")}
                 className={cn(
                   "flex-1 rounded-md py-1 text-xs font-medium transition-colors",
-                  mode === "upload"
+                  mode === "custom"
                     ? "bg-primary text-primary-foreground"
                     : "text-muted-foreground hover:text-foreground",
                 )}
               >
-                Upload doc
+                Custom
               </button>
             </div>
+
+            {/* Sub-selector (only in custom mode) */}
+            {mode === "custom" && (
+              <div className="mb-3 flex rounded-md border bg-muted p-0.5">
+                {(["upload", "paste", "link", "form"] as const).map((src) => (
+                  <button
+                    key={src}
+                    onClick={() => {
+                      setCustomSource(src);
+                      setUploadState({ status: "idle" });
+                    }}
+                    className={cn(
+                      "flex-1 rounded py-0.5 text-[11px] font-medium capitalize transition-colors",
+                      customSource === src
+                        ? "bg-background text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    {src === "upload" ? "Upload" : src === "paste" ? "Paste" : src === "link" ? "Link" : "Form"}
+                  </button>
+                ))}
+              </div>
+            )}
 
             {mode === "preset" ? (
               <div className="space-y-2">
@@ -280,9 +369,27 @@ export default function TryPage() {
                   </button>
                 ))}
               </div>
-            ) : (
+            ) : customSource === "upload" ? (
               <DocUploader
                 onIngest={handleIngest}
+                state={uploadState}
+                disabled={call.status === "live" || call.status === "connecting"}
+              />
+            ) : customSource === "paste" ? (
+              <TextPaste
+                onSubmit={handlePasteText}
+                state={uploadState}
+                disabled={call.status === "live" || call.status === "connecting"}
+              />
+            ) : customSource === "link" ? (
+              <UrlInput
+                onSubmit={handleIngestUrl}
+                state={uploadState}
+                disabled={call.status === "live" || call.status === "connecting"}
+              />
+            ) : (
+              <BusinessForm
+                onSubmit={handleGenerateFromForm}
                 state={uploadState}
                 disabled={call.status === "live" || call.status === "connecting"}
               />
@@ -291,12 +398,18 @@ export default function TryPage() {
 
           <section className="rounded-xl border bg-card p-4">
             <div className="mb-2 flex items-center justify-between">
-              <h2 className="text-sm font-semibold">{preset.name}</h2>
-              <Badge variant="secondary" className="font-mono text-[10px]">{preset.chunkCount} chunks</Badge>
+              <h2 className="text-sm font-semibold">
+                {mode !== "preset" && uploadedBizQ ? uploadedBizQ.companyName : preset.name}
+              </h2>
+              <Badge variant="secondary" className="font-mono text-[10px]">
+                {mode !== "preset" && uploadedBizQ ? uploadedBizQ.chunks.length : preset.chunkCount} chunks
+              </Badge>
             </div>
-            <p className="text-xs text-muted-foreground">{preset.hours}</p>
+            <p className="text-xs text-muted-foreground">
+              {mode !== "preset" && uploadedBizQ ? uploadedBizQ.hours : preset.hours}
+            </p>
             <div className="mt-3 flex flex-wrap gap-1.5">
-              {preset.services.map((s) => (
+              {(mode !== "preset" && uploadedBizQ ? uploadedBizQ.services : preset.services).map((s) => (
                 <span key={s} className="rounded-md border bg-muted px-2 py-0.5 text-[11px]">{s}</span>
               ))}
             </div>

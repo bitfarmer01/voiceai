@@ -22,6 +22,7 @@ import type * as lifecycle from "../lifecycle.js";
 import type * as providerStats from "../providerStats.js";
 import type * as providers from "../providers.js";
 import type * as seed from "../seed.js";
+import type * as sources from "../sources.js";
 import type * as seedPresets from "../seedPresets.js";
 import type * as spans from "../spans.js";
 import type * as telemetry from "../telemetry.js";
@@ -51,6 +52,7 @@ declare const fullApi: ApiFromModules<{
   providers: typeof providers;
   seed: typeof seed;
   seedPresets: typeof seedPresets;
+  sources: typeof sources;
   spans: typeof spans;
   telemetry: typeof telemetry;
   tools: typeof tools;
