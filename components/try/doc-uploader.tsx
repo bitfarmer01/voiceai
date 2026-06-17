@@ -18,7 +18,7 @@ interface DocUploaderProps {
 }
 
 const ACCEPTED =
-  ".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain";
+  ".pdf,.docx,.txt,.png,.jpg,.jpeg,.webp,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,image/png,image/jpeg,image/webp";
 const MAX_MB = 5;
 
 export function DocUploader({ onIngest, state, disabled }: DocUploaderProps) {
@@ -85,7 +85,7 @@ export function DocUploader({ onIngest, state, disabled }: DocUploaderProps) {
           <>
             <Upload className="size-6 text-muted-foreground" />
             <span className="text-sm font-medium">Drop a doc or click to browse</span>
-            <span className="text-xs text-muted-foreground">PDF · DOCX · TXT · max 5 MB</span>
+            <span className="text-xs text-muted-foreground">PDF · DOCX · TXT · PNG · JPG · max 5 MB</span>
           </>
         )}
       </button>
