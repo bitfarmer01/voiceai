@@ -55,11 +55,6 @@ function pick(obj: unknown, ...path: string[]): unknown {
   return cur;
 }
 
-function asNumber(x: unknown, fallback = 0): number {
-  const n = typeof x === "string" ? Number(x) : x;
-  return typeof n === "number" && Number.isFinite(n) ? n : fallback;
-}
-
 function asString(x: unknown): string | undefined {
   return typeof x === "string" ? x : undefined;
 }
