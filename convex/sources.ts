@@ -46,7 +46,6 @@ export const ingestText = action({
 
     const sanitized = sanitizeProfile(object);
 
-    // @ts-ignore storageId/fileName/mimeType become optional in Task 4
     const businessId = await ctx.runMutation(internal.businesses.insertUploadedBusiness, {
       sessionId: args.sessionId,
       ...sanitized,
@@ -123,7 +122,6 @@ export const ingestUrl = action({
 
     const sanitized = sanitizeProfile(object);
 
-    // @ts-ignore storageId/fileName/mimeType become optional in Task 4
     const businessId = await ctx.runMutation(internal.businesses.insertUploadedBusiness, {
       sessionId: args.sessionId,
       ...sanitized,
@@ -165,7 +163,6 @@ export const generateFromForm = action({
 
     const sanitized = sanitizeProfile(object);
 
-    // @ts-ignore storageId/fileName/mimeType become optional in Task 4
     const businessId = await ctx.runMutation(internal.businesses.insertUploadedBusiness, {
       sessionId: args.sessionId,
       ...sanitized,

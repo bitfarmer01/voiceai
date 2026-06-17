@@ -69,9 +69,9 @@ export const getWithChunks = query({
 export const insertUploadedBusiness = internalMutation({
   args: {
     sessionId: v.string(),
-    storageId: v.id("_storage"),
-    fileName: v.string(),
-    mimeType: v.string(),
+    storageId: v.optional(v.id("_storage")),
+    fileName: v.optional(v.string()),
+    mimeType: v.optional(v.string()),
     companyName: v.string(),
     hours: v.string(),
     services: v.array(v.string()),
@@ -92,11 +92,9 @@ export const insertUploadedBusiness = internalMutation({
         policies: args.policies,
         availability: args.availability,
       },
-      sourceMeta: {
-        fileName: args.fileName,
-        mimeType: args.mimeType,
-        storageId: args.storageId,
-      },
+      sourceMeta: args.storageId
+        ? { storageId: args.storageId, fileName: args.fileName!, mimeType: args.mimeType! }
+        : undefined,
       chunkCount: args.chunks.length,
       createdAt: Date.now(),
       expiresAt: Date.now() + 24 * 60 * 60 * 1000,

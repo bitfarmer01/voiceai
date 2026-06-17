@@ -65,3 +65,23 @@ test("getWithChunks: returns null for unknown businessId", async () => {
   });
   expect(result).toBeNull();
 });
+
+test("insertUploadedBusiness with no storage args: inserts business, sourceMeta undefined, getWithChunks returns profile + chunks", async () => {
+  const t = convexTest(schema, modules);
+  const businessId = await t.mutation(internal.businesses.insertUploadedBusiness, {
+    sessionId: "s1",
+    companyName: "Acme",
+    hours: "9-5",
+    services: ["Consulting"],
+    policies: ["No refunds"],
+    availability: "Weekdays",
+    chunks: [{ text: "We open at 9am", tags: ["hours"] }],
+  });
+
+  expect(businessId).toBeTruthy();
+
+  const result = await t.query(api.businesses.getWithChunks, { businessId });
+  expect(result).not.toBeNull();
+  expect(result!.companyName).toBe("Acme");
+  expect(result!.chunks).toHaveLength(1);
+});
