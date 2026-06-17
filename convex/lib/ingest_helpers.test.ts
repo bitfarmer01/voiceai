@@ -11,7 +11,7 @@ import {
   clampFormInput,
   htmlToText,
   assertSafeUrl,
-} from "./ingest-helpers";
+} from "./ingest_helpers";
 import { z } from "zod";
 
 describe("sanitize", () => {

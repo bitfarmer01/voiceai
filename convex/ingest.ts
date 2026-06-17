@@ -12,7 +12,7 @@ import {
   toDataUrl,
   buildExtractionPrompt,
   buildOcrPrompt,
-} from "./lib/ingest-helpers";
+} from "./lib/ingest_helpers";
 
 const NIM_BASE_URL = "https://integrate.api.nvidia.com/v1";
 const NIM_MODEL = "nvidia/nemotron-3-nano-30b-a3b";
