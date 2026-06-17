@@ -63,12 +63,14 @@ const costBreakdown = v.object({
 });
 
 // QualityMetrics — plan.md §10 calls.qualityMetrics / §8.7
+// sentiment is optional: Phase 3 computes the four deterministic metrics
+// client-side; sentiment needs a model call and is deferred to v1.1.
 const qualityMetrics = v.object({
   talkRatio: v.number(),
   interruptions: v.number(),
   deadAirSec: v.number(),
   wpm: v.number(),
-  sentiment: v.number(),
+  sentiment: v.optional(v.number()),
 });
 
 // Business profile — plan.md §5.1 / §10 businesses.profile
@@ -166,7 +168,10 @@ export default defineSchema({
     endMs: v.number(),
     durationMs: v.number(),
     attrs: v.optional(v.record(v.string(), v.union(v.string(), v.number(), v.boolean()))),
-  }).index("by_trace", ["traceId"]),
+  })
+    .index("by_trace", ["traceId"])
+    // Point-lookup for the idempotent flush upsert (traceId + spanId).
+    .index("by_trace_span", ["traceId", "spanId"]),
 
   // ── logs ──────────────────────────────────────────────────────────────────────
   // plan.md §5.3 / §10. Structured logs correlated by traceId.

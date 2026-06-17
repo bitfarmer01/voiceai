@@ -10,6 +10,7 @@ import { formatUsd, formatDuration, formatMs } from "@/lib/format";
 import { TraceWaterfall } from "@/components/shared/trace-waterfall";
 import type { WaterfallTurn } from "@/components/shared/trace-waterfall";
 import { CostBreakdown } from "@/components/shared/cost-breakdown";
+import { QualityMetricsPanel } from "@/components/shared/quality-metrics";
 import { CallTimeline } from "@/components/shared/call-timeline";
 import { StarRating } from "@/components/shared/star-rating";
 import { EmptyState } from "@/components/states/empty-state";
@@ -123,6 +124,13 @@ export function CallReportClient({ id }: { id: string }) {
     ttfwMs?: number;
     summary?: string;
     structuredData?: unknown;
+    qualityMetrics?: {
+      talkRatio: number;
+      interruptions: number;
+      deadAirSec: number;
+      wpm: number;
+      sentiment?: number;
+    };
   };
 
   const waterfallTurns = spansToWaterfallTurns(spans ?? []);
@@ -253,6 +261,19 @@ export function CallReportClient({ id }: { id: string }) {
           <section className="rounded-xl border bg-card p-5">
             <h2 className="mb-4 text-sm font-semibold">Cost breakdown</h2>
             <CostBreakdown cost={c.costBreakdown} />
+          </section>
+
+          <section className="rounded-xl border bg-card p-5">
+            <h2 className="mb-4 text-sm font-semibold">Call quality</h2>
+            {c.qualityMetrics ? (
+              <QualityMetricsPanel metrics={c.qualityMetrics} />
+            ) : (
+              <EmptyState
+                title="No quality metrics"
+                description="Metrics are computed when the call ends. Make a call to see them."
+                action={{ label: "Make a call", href: "/try" }}
+              />
+            )}
           </section>
 
           <section className="rounded-xl border bg-card p-5">
