@@ -253,6 +253,14 @@ describe("assertSafeUrl", () => {
     expect(() => assertSafeUrl("http://10.0.0.1")).toThrow("ingest_failed: invalid or unsafe URL");
   });
 
+  it("throws for http://172.16.0.1", () => {
+    expect(() => assertSafeUrl("http://172.16.0.1")).toThrow("ingest_failed: invalid or unsafe URL");
+  });
+
+  it("throws for http://172.31.255.255", () => {
+    expect(() => assertSafeUrl("http://172.31.255.255")).toThrow("ingest_failed: invalid or unsafe URL");
+  });
+
   it("throws for http://my.local", () => {
     expect(() => assertSafeUrl("http://my.local")).toThrow("ingest_failed: invalid or unsafe URL");
   });

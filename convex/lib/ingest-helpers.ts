@@ -1,5 +1,3 @@
-import { z } from "zod";
-
 /**
  * Injection-stripper. Removes prompt injection attempts.
  */
@@ -185,8 +183,8 @@ export function assertSafeUrl(urlStr: string): void {
       })()) ||
     hostname === "0.0.0.0" ||
     hostname === "::1" ||
-    hostname === "fc00::" ||
-    hostname === "fe80::"
+    hostname.startsWith("fc00:") ||
+    hostname.startsWith("fe80:")
   ) {
     throw new Error("ingest_failed: invalid or unsafe URL");
   }
