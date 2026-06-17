@@ -24,6 +24,10 @@ import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { RECEPTIONIST_TOOL_NAMES } from "./_contracts";
 import type { Id } from "./_generated/dataModel";
+import {
+  normalizeVapiEndOfCallReport,
+  engineReportToRecordArgs,
+} from "./lib/vapiReport";
 
 const http = httpRouter();
 
@@ -192,13 +196,13 @@ const vapiWebhook = httpAction(async (ctx, request) => {
   // 3. Branch on message type. ACK 200 in every branch; heavy work is scheduled.
   switch (type) {
     case "end-of-call-report": {
-      const report = mapEndOfCallReport(msg);
+      const report = normalizeVapiEndOfCallReport(body);
       if (report) {
         // Off-path: finalize the call in a scheduled internal mutation.
         await ctx.scheduler.runAfter(
           0,
           internal.calls.recordEndOfCall,
-          report,
+          engineReportToRecordArgs(report),
         );
       }
       return json({ ok: true }, 200);
@@ -223,95 +227,6 @@ const vapiWebhook = httpAction(async (ctx, request) => {
       return json({ ok: true, ignored: type || "unknown" }, 200);
   }
 });
-
-/**
- * Reduce VAPI's end-of-call-report message → recordEndOfCall args.
- * VAPI's report shape (approx):
- *   message.call.id              — the VAPI call id
- *   message.durationSeconds      — call length
- *   message.cost                 — total cost (USD)
- *   message.costBreakdown        — { stt, llm, tts, ... } (key names vary)
- *   message.analysis.summary
- *   message.analysis.structuredData
- *   message.analysis.successEvaluation
- * TODO(vapi-shape): confirm every field path against a live report; the cost
- * breakdown key names in particular have varied across VAPI versions.
- */
-function mapEndOfCallReport(msg: Record<string, unknown>):
-  | {
-      vapiCallId: string;
-      durationSec: number;
-      costUsd: number;
-      costBreakdown: { stt: number; llm: number; tts: number; platform: number };
-      summary?: string;
-      structuredData?: unknown;
-      successEval?: boolean;
-      languages?: string[];
-      ttfwMs?: number;
-    }
-  | null {
-  const vapiCallId =
-    asString(pick(msg, "call", "id")) ??
-    asString(pick(msg, "callId")) ??
-    asString(pick(msg, "call", "callId"));
-  if (!vapiCallId) return null;
-
-  const durationSec = asNumber(
-    msg.durationSeconds ?? pick(msg, "durationSeconds") ?? msg.duration,
-    0,
-  );
-
-  const costUsd = asNumber(msg.cost ?? pick(msg, "cost"), 0);
-
-  // Cost breakdown: VAPI reports component costs under `costBreakdown` with
-  // (version-dependent) keys. Map the common ones; platform = remainder.
-  const cb = (msg.costBreakdown as Record<string, unknown> | undefined) ?? {};
-  const stt = asNumber(cb.stt ?? cb.transcriber, 0);
-  const llm = asNumber(cb.llm ?? cb.model, 0);
-  const tts = asNumber(cb.tts ?? cb.voice, 0);
-  // Anything reported but not attributed to a component → platform.
-  const platformExplicit = asNumber(cb.vapi ?? cb.platform, NaN);
-  const platform = Number.isFinite(platformExplicit)
-    ? platformExplicit
-    : Math.max(0, costUsd - stt - llm - tts);
-
-  const summary = asString(pick(msg, "analysis", "summary")) ?? asString(msg.summary);
-  const structuredData =
-    pick(msg, "analysis", "structuredData") ?? msg.structuredData;
-
-  const successRaw =
-    pick(msg, "analysis", "successEvaluation") ?? msg.successEvaluation;
-  let successEval: boolean | undefined;
-  if (typeof successRaw === "boolean") successEval = successRaw;
-  else if (typeof successRaw === "string") {
-    const s = successRaw.toLowerCase();
-    if (s === "true" || s === "pass" || s === "success") successEval = true;
-    else if (s === "false" || s === "fail") successEval = false;
-  }
-
-  // Languages / ttfw aren't reliably in the report; leave undefined unless present.
-  const langs = pick(msg, "analysis", "languages") ?? msg.languages;
-  const languages = Array.isArray(langs)
-    ? langs.filter((l): l is string => typeof l === "string")
-    : undefined;
-
-  const ttfwMs = asNumber(
-    pick(msg, "performanceMetrics", "ttfwMs") ?? pick(msg, "ttfwMs"),
-    NaN,
-  );
-
-  return {
-    vapiCallId,
-    durationSec,
-    costUsd,
-    costBreakdown: { stt, llm, tts, platform },
-    summary,
-    structuredData,
-    successEval,
-    languages,
-    ttfwMs: Number.isFinite(ttfwMs) ? ttfwMs : undefined,
-  };
-}
 
 // ════════════════════════════════════════════════════════════════════════════════
 // /tools/* — receptionist tools
