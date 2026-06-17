@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useMutation, useQuery } from "convex/react";
+import { useMutation, useQuery, useAction } from "convex/react";
 import { CheckCircle2, FileText } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import { cn } from "@/lib/utils";
@@ -10,7 +10,8 @@ import { formatUsd } from "@/lib/format";
 import { PRESETS, getPreset } from "@/lib/data/presets";
 import { useBudgetState } from "@/lib/data";
 import { useVisitorKey } from "@/lib/hooks/use-visitor-key";
-import { DEFAULT_PIPELINE, buildAssistant, type PipelineSelection } from "@/lib/vapi/assistant";
+import { DEFAULT_PIPELINE, buildAssistant, buildAssistantFromConvexBusiness, type PipelineSelection } from "@/lib/vapi/assistant";
+import { DocUploader, type UploadState } from "@/components/try/doc-uploader";
 import { useVapiCall } from "@/lib/vapi/use-vapi-call";
 
 import { AgentStage } from "@/components/try/agent-stage";
@@ -59,18 +60,97 @@ export default function TryPage() {
   const businesses = useQuery(api.businesses.listPresets);
   const guard = useQuery(api.guard.canStartCall, visitorKey ? { visitorKey } : "skip");
 
+  const [mode, setMode] = React.useState<"preset" | "upload">("preset");
+  const [uploadState, setUploadState] = React.useState<UploadState>({ status: "idle" });
+
   const startCallM = useMutation(api.calls.startCall);
   const attachVapiIdM = useMutation(api.calls.attachVapiId);
   const endCallM = useMutation(api.lifecycle.endCall);
+  const generateUploadUrlM = useMutation(api.businesses.generateUploadUrl);
+  const ingestDocumentA = useAction(api.ingest.ingestDocument);
+  const uploadedBizQ = useQuery(
+    api.businesses.getWithChunks,
+    uploadState.status === "ready" ? { businessId: uploadState.businessId as any } : "skip",
+  );
 
   const preset = getPreset(presetId)!;
   const blocked = !!guard && !guard.allowed;
-  const ready = !!businesses && !!visitorKey;
+  const ready =
+    mode === "preset"
+      ? !!businesses && !!visitorKey
+      : !!visitorKey && uploadState.status === "ready" && !!uploadedBizQ;
+
+  const handleIngest = React.useCallback(
+    async (file: File) => {
+      setUploadState({ status: "uploading", progress: 0 });
+      try {
+        const uploadUrl = await generateUploadUrlM({});
+        const res = await fetch(uploadUrl, {
+          method: "POST",
+          headers: { "Content-Type": file.type },
+          body: file,
+        });
+        if (!res.ok) throw new Error("Upload failed");
+        const { storageId } = await res.json();
+        setUploadState({ status: "analyzing" });
+        const { businessId } = await ingestDocumentA({
+          storageId,
+          sessionId,
+          fileName: file.name,
+          mimeType: file.type || "text/plain",
+        });
+        setUploadState({ status: "ready", businessId, fileName: file.name });
+      } catch (e) {
+        setUploadState({
+          status: "error",
+          message:
+            e instanceof Error
+              ? e.message
+              : "Couldn't read that file — try another or pick a preset.",
+        });
+      }
+    },
+    [generateUploadUrlM, ingestDocumentA, sessionId],
+  );
 
   const beginCall = React.useCallback(async () => {
     setStartError(null);
+    if (!visitorKey) return;
+
+    if (mode === "upload") {
+      if (!uploadedBizQ || uploadState.status !== "ready") return;
+      try {
+        const callId = await startCallM({
+          sessionId,
+          businessId: uploadedBizQ._id,
+          visitorKey,
+          sttProvider: pipeline.sttId,
+          ttsProvider: pipeline.ttsId,
+          llmProvider: pipeline.llmId,
+        });
+        activeCallIdRef.current = callId;
+        const assistant = buildAssistantFromConvexBusiness(uploadedBizQ, pipeline, {
+          webhookUrl: WEBHOOK_URL,
+          toolBaseUrl: SITE_URL || undefined,
+          secret: PUBLIC_KEY,
+        });
+        const vapiCallId = await call.start(assistant);
+        if (vapiCallId) {
+          await attachVapiIdM({ callId, vapiCallId });
+        } else {
+          await endCallM({ callId, reason: "start_failed" });
+          activeCallIdRef.current = null;
+        }
+      } catch (e) {
+        setStartError(e instanceof Error ? e.message : "Couldn't start the call.");
+        activeCallIdRef.current = null;
+      }
+      return;
+    }
+
+    // Preset mode
     const business = businesses?.find((b) => b.name === preset.name);
-    if (!business || !visitorKey) return;
+    if (!business) return;
     try {
       const callId = await startCallM({
         sessionId,
@@ -99,7 +179,20 @@ export default function TryPage() {
       setStartError(e instanceof Error ? e.message : "Couldn't start the call.");
       activeCallIdRef.current = null;
     }
-  }, [businesses, preset, visitorKey, sessionId, pipeline, startCallM, call, attachVapiIdM, endCallM]);
+  }, [
+    mode,
+    uploadedBizQ,
+    uploadState,
+    businesses,
+    preset,
+    visitorKey,
+    sessionId,
+    pipeline,
+    startCallM,
+    call,
+    attachVapiIdM,
+    endCallM,
+  ]);
 
   React.useEffect(() => {
     if (call.status === "ended" && activeCallIdRef.current) {
@@ -138,27 +231,62 @@ export default function TryPage() {
         {/* LEFT — Setup */}
         <div className="space-y-4">
           <section className="rounded-xl border bg-card p-4">
-            <h2 className="mb-3 text-sm font-semibold">Choose a business</h2>
-            <div className="space-y-2">
-              {PRESETS.map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => setPresetId(p.id)}
-                  disabled={call.status === "live" || call.status === "connecting"}
-                  className={cn(
-                    "flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors disabled:opacity-50",
-                    presetId === p.id ? "border-primary bg-accent" : "hover:bg-muted",
-                  )}
-                >
-                  <FileText className="size-4 text-muted-foreground" />
-                  <div>
-                    <p className="text-sm font-medium">{p.name}</p>
-                    <p className="text-xs text-muted-foreground">{p.services.slice(0, 3).join(" · ")}</p>
-                  </div>
-                  {presetId === p.id && <CheckCircle2 className="ml-auto size-4 text-primary" />}
-                </button>
-              ))}
+            {/* Mode toggle */}
+            <div className="mb-3 flex rounded-lg border p-0.5">
+              <button
+                onClick={() => setMode("preset")}
+                className={cn(
+                  "flex-1 rounded-md py-1 text-xs font-medium transition-colors",
+                  mode === "preset"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                Presets
+              </button>
+              <button
+                onClick={() => setMode("upload")}
+                className={cn(
+                  "flex-1 rounded-md py-1 text-xs font-medium transition-colors",
+                  mode === "upload"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                Upload doc
+              </button>
             </div>
+
+            {mode === "preset" ? (
+              <div className="space-y-2">
+                {PRESETS.map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => setPresetId(p.id)}
+                    disabled={call.status === "live" || call.status === "connecting"}
+                    className={cn(
+                      "flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors disabled:opacity-50",
+                      presetId === p.id ? "border-primary bg-accent" : "hover:bg-muted",
+                    )}
+                  >
+                    <FileText className="size-4 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm font-medium">{p.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {p.services.slice(0, 3).join(" · ")}
+                      </p>
+                    </div>
+                    {presetId === p.id && <CheckCircle2 className="ml-auto size-4 text-primary" />}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <DocUploader
+                onIngest={handleIngest}
+                state={uploadState}
+                disabled={call.status === "live" || call.status === "connecting"}
+              />
+            )}
           </section>
 
           <section className="rounded-xl border bg-card p-4">
