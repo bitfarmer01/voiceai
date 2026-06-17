@@ -1,27 +1,35 @@
 /**
- * Wave A — Telemetry off the critical path (plan.md §5.3).
+ * Wave A / Phase 3 — Telemetry off the critical path (plan.md §5.3).
  *
- * `batchWriteSpans` is the fire-and-forget sink the client (and our own
- * tool endpoints) flush OTel spans into. The live view renders from local
- * React state; spans are written here in batches (~500ms / on call end), so
- * this is NEVER on the audio render path.
+ * `batchWriteSpans` is the sink the Web SDK client flushes derived OTel spans
+ * into. The live call renders from local React state; spans are flushed here on
+ * a timer (~5s) and once more on call-end, so this is NEVER on the audio render
+ * path. As of Phase 3 the client is the SINGLE source of truth for the trace
+ * (turn/stt/llm/tts + tool spans, all on one clock), so there is no server-side
+ * span sink — the old wrong-keyed tool-span path was removed.
  *
- * Public so the Vapi Web SDK client can call it directly; it only writes
- * append-only span rows, so exposing it is low-risk.
+ * Public so the client can call it directly. Guarded on three fronts so one
+ * browser cannot pollute or spoof another call's trace: the call must exist, the
+ * caller must own it (its sessionId must match), and every span must be keyed to
+ * that call's id (the report's trace key). Upserts by (traceId, spanId) — via the
+ * by_trace_span index — so the periodic + final flush are idempotent and cheap.
  */
-import { mutation, internalMutation } from "./_generated/server";
+import { mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { traceSpanValidator } from "./_contracts";
 
 export const batchWriteSpans = mutation({
-  args: { spans: v.array(traceSpanValidator) },
+  args: { callId: v.id("calls"), sessionId: v.string(), spans: v.array(traceSpanValidator) },
   returns: v.null(),
   handler: async (ctx, args) => {
-    // Bulk insert. Spans are small and append-only; one batch stays well under
-    // the per-mutation write ceiling. If a caller ever sends a huge batch the
-    // client should chunk it (the flush cadence keeps batches small in practice).
+    // Guard: unknown call or a caller that doesn't own it → drop silently.
+    const call = await ctx.db.get(args.callId);
+    if (!call || call.sessionId !== args.sessionId) return null;
+
     for (const span of args.spans) {
-      await ctx.db.insert("spans", {
+      // Reject any span not keyed to this call — no cross-trace contamination.
+      if (span.traceId !== args.callId) continue;
+      const fields = {
         traceId: span.traceId,
         spanId: span.spanId,
         parentId: span.parentId,
@@ -31,32 +39,22 @@ export const batchWriteSpans = mutation({
         endMs: span.endMs,
         durationMs: span.durationMs,
         attrs: span.attrs,
-      });
+      };
+      // Upsert by (traceId, spanId): the client re-flushes already-seen spans on
+      // each tick; without this, every flush would duplicate them, and a span
+      // whose window grew (assistant kept speaking) would never update.
+      const prev = await ctx.db
+        .query("spans")
+        .withIndex("by_trace_span", (q) =>
+          q.eq("traceId", args.callId).eq("spanId", span.spanId),
+        )
+        .unique();
+      if (prev) {
+        await ctx.db.patch(prev._id, fields);
+      } else {
+        await ctx.db.insert("spans", fields);
+      }
     }
-    return null;
-  },
-});
-
-/**
- * Single-span sink the tool httpActions schedule (fire-and-forget) so they can
- * "respond first, log after" without exposing a public mutation to VAPI.
- */
-export const writeSpanInternal = internalMutation({
-  args: { span: traceSpanValidator },
-  returns: v.null(),
-  handler: async (ctx, args) => {
-    const s = args.span;
-    await ctx.db.insert("spans", {
-      traceId: s.traceId,
-      spanId: s.spanId,
-      parentId: s.parentId,
-      kind: s.kind,
-      label: s.label,
-      startMs: s.startMs,
-      endMs: s.endMs,
-      durationMs: s.durationMs,
-      attrs: s.attrs,
-    });
     return null;
   },
 });

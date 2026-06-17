@@ -22,7 +22,6 @@
 import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
-import { RECEPTIONIST_TOOL_NAMES } from "./_contracts";
 import type { Id } from "./_generated/dataModel";
 import {
   normalizeVapiEndOfCallReport,
@@ -128,35 +127,10 @@ function extractToolCalls(body: unknown): NormalizedToolCall[] {
   return out;
 }
 
-/** Emit a fire-and-forget span via the telemetry sink (off the critical path). */
-async function emitToolSpan(
-  ctx: { scheduler: { runAfter: (ms: number, fn: any, args: any) => Promise<unknown> } },
-  opts: {
-    traceId: string;
-    spanId: string;
-    label: string;
-    startMs: number;
-    endMs: number;
-    attrs?: Record<string, string | number | boolean>;
-  },
-): Promise<void> {
-  try {
-    await ctx.scheduler.runAfter(0, internal.telemetry.writeSpanInternal, {
-      span: {
-        traceId: opts.traceId,
-        spanId: opts.spanId,
-        kind: "tool" as const,
-        label: opts.label,
-        startMs: opts.startMs,
-        endMs: opts.endMs,
-        durationMs: Math.max(0, opts.endMs - opts.startMs),
-        attrs: opts.attrs,
-      },
-    });
-  } catch {
-    // Telemetry is best-effort; never let it affect the tool response.
-  }
-}
+// Tool-call telemetry is emitted CLIENT-SIDE in Phase 3 (the Web SDK delivers
+// tool-calls + tool result client messages, and the client owns the single-clock
+// trace). The old server-side span sink — which mis-keyed spans to businessId and
+// never showed in the call report — was removed.
 
 // ════════════════════════════════════════════════════════════════════════════════
 // /vapi/webhook
@@ -234,7 +208,6 @@ function toolResponse(toolCallId: string, result: unknown): Response {
 
 // ── lookup_knowledge ──────────────────────────────────────────────────────────
 const lookupKnowledgeTool = httpAction(async (ctx, request) => {
-  const startMs = Date.now();
   let body: unknown;
   try {
     body = await request.json();
@@ -260,22 +233,11 @@ const lookupKnowledgeTool = httpAction(async (ctx, request) => {
     limit: typeof args.limit === "number" ? args.limit : undefined,
   });
 
-  // Respond first; span after.
-  const res = toolResponse(toolCallId, result);
-  await emitToolSpan(ctx, {
-    traceId: businessId,
-    spanId: `tool_lookup_${startMs}`,
-    label: RECEPTIONIST_TOOL_NAMES.lookupKnowledge,
-    startMs,
-    endMs: Date.now(),
-    attrs: { found: result.found, chunks: result.chunks.length },
-  });
-  return res;
+  return toolResponse(toolCallId, result);
 });
 
 // ── check_availability ────────────────────────────────────────────────────────
 const checkAvailabilityTool = httpAction(async (ctx, request) => {
-  const startMs = Date.now();
   let body: unknown;
   try {
     body = await request.json();
@@ -302,21 +264,11 @@ const checkAvailabilityTool = httpAction(async (ctx, request) => {
     service: asString(args.service),
   });
 
-  const res = toolResponse(toolCallId, result);
-  await emitToolSpan(ctx, {
-    traceId: businessId,
-    spanId: `tool_avail_${startMs}`,
-    label: RECEPTIONIST_TOOL_NAMES.checkAvailability,
-    startMs,
-    endMs: Date.now(),
-    attrs: { available: result.available, slots: result.slots.length },
-  });
-  return res;
+  return toolResponse(toolCallId, result);
 });
 
 // ── book_appointment ──────────────────────────────────────────────────────────
 const bookAppointmentTool = httpAction(async (ctx, request) => {
-  const startMs = Date.now();
   let body: unknown;
   try {
     body = await request.json();
@@ -353,16 +305,7 @@ const bookAppointmentTool = httpAction(async (ctx, request) => {
     idempotencyKey: asString(args.idempotencyKey),
   });
 
-  const res = toolResponse(toolCallId, result);
-  await emitToolSpan(ctx, {
-    traceId: businessId,
-    spanId: `tool_book_${startMs}`,
-    label: RECEPTIONIST_TOOL_NAMES.bookAppointment,
-    startMs,
-    endMs: Date.now(),
-    attrs: { booked: result.booked },
-  });
-  return res;
+  return toolResponse(toolCallId, result);
 });
 
 // ════════════════════════════════════════════════════════════════════════════════

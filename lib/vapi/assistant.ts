@@ -115,6 +115,19 @@ function buildTools(toolBaseUrl: string, businessId: string, secret?: string) {
   }));
 }
 
+/**
+ * Client messages the Web SDK must deliver so the hook can derive the trace
+ * (Phase 3). The SDK default omits the tool *result* messages, so we set the
+ * list explicitly: `transcript` drives turn/stt/llm/tts boundaries, and the
+ * three tool messages bound the client-side tool spans.
+ */
+const CLIENT_MESSAGES = [
+  "transcript",
+  "tool-calls",
+  "tool-calls-result",
+  "tool.completed",
+] as const;
+
 export function buildAssistant(
   b: PresetBusiness,
   pipeline: PipelineSelection,
@@ -134,6 +147,7 @@ export function buildAssistant(
     transcriber: transcriberFor(pipeline.sttId),
     voice: voiceFor(pipeline.ttsId),
     model: modelFor(pipeline.llmId, systemPrompt(b), tools),
+    clientMessages: CLIENT_MESSAGES,
     ...(opts?.webhookUrl
       ? {
           server: { url: opts.webhookUrl, ...(opts.secret ? { secret: opts.secret } : {}) },
@@ -182,6 +196,7 @@ export function buildAssistantFromConvexBusiness(
     transcriber: transcriberFor(pipeline.sttId),
     voice: voiceFor(pipeline.ttsId),
     model: modelFor(pipeline.llmId, systemPromptRaw(biz.name, knowledge), tools),
+    clientMessages: CLIENT_MESSAGES,
     ...(opts?.webhookUrl
       ? {
           server: { url: opts.webhookUrl, ...(opts.secret ? { secret: opts.secret } : {}) },

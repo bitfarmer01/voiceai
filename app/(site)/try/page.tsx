@@ -134,7 +134,7 @@ export default function TryPage() {
           toolBaseUrl: SITE_URL || undefined,
           secret: PUBLIC_KEY,
         });
-        const vapiCallId = await call.start(assistant);
+        const vapiCallId = await call.start(assistant, callId, sessionId);
         if (vapiCallId) {
           await attachVapiIdM({ callId, vapiCallId });
         } else {
@@ -167,7 +167,7 @@ export default function TryPage() {
         secret: PUBLIC_KEY,
         businessId: business._id,
       });
-      const vapiCallId = await call.start(assistant);
+      const vapiCallId = await call.start(assistant, callId, sessionId);
       if (vapiCallId) {
         await attachVapiIdM({ callId, vapiCallId });
       } else {

@@ -225,6 +225,40 @@ export const getById = query({
   },
 });
 
+// ── recordQualityMetrics (public; client, on call-end) ────────────────────────
+// The four deterministic metrics are computed client-side from the buffered
+// transcript + derived spans (the server has no per-turn transcript to recompute
+// from). sentiment is deferred (needs a model call), so it is omitted here.
+// Guarded: the call must exist and the caller's sessionId must own it. Values are
+// clamped to physically-possible ranges so a crafted client can't store garbage.
+export const recordQualityMetrics = mutation({
+  args: {
+    callId: v.id("calls"),
+    sessionId: v.string(),
+    metrics: v.object({
+      talkRatio: v.number(),
+      interruptions: v.number(),
+      deadAirSec: v.number(),
+      wpm: v.number(),
+    }),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const call = await ctx.db.get(args.callId);
+    if (!call || call.sessionId !== args.sessionId) return null;
+    const m = args.metrics;
+    await ctx.db.patch(args.callId, {
+      qualityMetrics: {
+        talkRatio: Math.min(1, Math.max(0, m.talkRatio)),
+        interruptions: Math.max(0, Math.round(m.interruptions)),
+        deadAirSec: Math.max(0, m.deadAirSec),
+        wpm: Math.max(0, m.wpm),
+      },
+    });
+    return null;
+  },
+});
+
 // ── listRecent ────────────────────────────────────────────────────────────────
 // Recent ENDED calls, newest-first, mapped to CallSummary.
 export const listRecent = query({
