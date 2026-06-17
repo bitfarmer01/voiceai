@@ -70,9 +70,12 @@ export const ingestUrl = action({
     try {
       const res = await fetch(args.url, {
         signal: controller.signal,
-        redirect: "follow",
+        redirect: "manual",
         headers: { "User-Agent": "Mozilla/5.0 (compatible; VoiceAI/1.0)" },
       });
+      if (res.type === "opaqueredirect" || (res.status >= 300 && res.status < 400)) {
+        throw new Error("ingest_failed: redirects not supported — paste the final URL directly");
+      }
       if (!res.ok) throw new Error(`ingest_failed: HTTP ${res.status}`);
       const MAX_RESPONSE_BYTES = 1 * 1024 * 1024; // 1 MB
       const reader = res.body?.getReader();

@@ -112,6 +112,10 @@ export function clampFormInput(raw: {
     throw new Error("ingest_failed: company name must be at least 2 characters");
   }
 
+  if (industry.length === 0) {
+    throw new Error("ingest_failed: industry is required");
+  }
+
   return {
     companyName: companyName.slice(0, 120),
     industry: industry.slice(0, 80),

@@ -84,6 +84,12 @@ describe("clampFormInput", () => {
     );
   });
 
+  it("throws when industry is blank after trim", () => {
+    expect(() =>
+      clampFormInput({ companyName: "Acme", industry: "  ", description: "" })
+    ).toThrow("ingest_failed: industry is required");
+  });
+
   it("clamps companyName to 120 chars", () => {
     const longName = "A".repeat(150);
     const result = clampFormInput({ companyName: longName, industry: "test", description: "test" });
