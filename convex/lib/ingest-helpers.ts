@@ -29,7 +29,7 @@ export function sanitizeProfile(object: {
 /**
  * Returns the Zod schema for business profile extraction.
  */
-export function businessProfileSchema(z: typeof import("zod")) {
+export function businessProfileSchema(z: typeof import("zod").z) {
   return z.object({
     companyName: z.string().max(120),
     hours: z.string().max(200),
