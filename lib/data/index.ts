@@ -47,9 +47,9 @@ export function useRecentCalls(): CallSummary[] {
   return (data as CallSummary[] | undefined) ?? MOCK_RECENT_CALLS;
 }
 
-// ── still mock until Wave B (no backing query yet) ──────────────────────────────
 export function useProviderStats(kind?: ProviderKind): ProviderStat[] {
-  return kind ? MOCK_PROVIDER_STATS.filter((p) => p.kind === kind) : MOCK_PROVIDER_STATS;
+  const data = useQuery(api.providerStats.list, kind ? { kind } : {});
+  return (data as ProviderStat[] | undefined) ?? MOCK_PROVIDER_STATS;
 }
 
 export function useProviders(kind?: ProviderKind): Provider[] {
