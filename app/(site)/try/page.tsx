@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { useMutation, useQuery } from "convex/react";
 import { CheckCircle2, FileText } from "lucide-react";
 import { api } from "@/convex/_generated/api";
@@ -47,6 +48,7 @@ export default function TryPage() {
   const [pipeline, setPipeline] = React.useState<PipelineSelection>(DEFAULT_PIPELINE);
   const [consentOpen, setConsentOpen] = React.useState(false);
   const [startError, setStartError] = React.useState<string | null>(null);
+  const [lastCallId, setLastCallId] = React.useState<string | null>(null);
   const consentedRef = React.useRef(false);
   const activeCallIdRef = React.useRef<string | null>(null);
   const [sessionId] = React.useState(() => crypto.randomUUID());
@@ -96,6 +98,12 @@ export default function TryPage() {
       activeCallIdRef.current = null;
     }
   }, [businesses, preset, visitorKey, sessionId, pipeline, startCallM, call, attachVapiIdM, endCallM]);
+
+  React.useEffect(() => {
+    if (call.status === "ended" && activeCallIdRef.current) {
+      setLastCallId(activeCallIdRef.current);
+    }
+  }, [call.status]);
 
   const handleTalk = () => {
     if (call.status === "ended") call.reset();
@@ -199,6 +207,16 @@ export default function TryPage() {
             {startError && <p className="mt-3 text-center text-xs text-danger">{startError}</p>}
             {call.error && !micDenied && (
               <p className="mt-2 text-center text-xs text-danger">{call.error}</p>
+            )}
+            {call.status === "ended" && lastCallId && (
+              <div className="mt-3 text-center">
+                <Link
+                  href={`/calls/${lastCallId}`}
+                  className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
+                >
+                  View post-call report →
+                </Link>
+              </div>
             )}
           </div>
           <div className="min-h-0 flex-1 border-t p-4">
