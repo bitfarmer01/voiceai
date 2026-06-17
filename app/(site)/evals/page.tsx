@@ -1,97 +1,120 @@
 "use client";
 
-import { FlaskConical, Info } from "lucide-react";
-import { EvalResults } from "@/components/shared/eval-results";
-import type { EvalRow } from "@/components/shared/eval-results";
+import { FlaskConical, TrendingDown } from "lucide-react";
+import { EvalBadge } from "@/components/shared/status-badge";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
-const STUB_ROWS: EvalRow[] = [
+const STUB_RUNS = [
   {
-    id: "e1",
-    scenario: "Book appointment — happy path",
-    category: "Scheduling",
-    status: "pass",
-    taskSuccess: 0.97,
-    grounding: 0.95,
-    latencyMs: 820,
-    deltaVsBaseline: 0.03,
-    regressed: false,
+    id: "run1",
+    timestamp: "2026-06-17 14:30",
+    status: "pass" as const,
+    passRate: 0.8,
+    groundingScore: 0.94,
+    p50LatencyMs: 725,
   },
   {
-    id: "e2",
-    scenario: "FAQ lookup — hours of operation",
-    category: "Knowledge",
-    status: "pass",
-    taskSuccess: 0.93,
-    grounding: 0.98,
-    latencyMs: 640,
-    deltaVsBaseline: 0.01,
-    regressed: false,
+    id: "run2",
+    timestamp: "2026-06-17 12:15",
+    status: "pass" as const,
+    passRate: 0.8,
+    groundingScore: 0.93,
+    p50LatencyMs: 710,
   },
   {
-    id: "e3",
-    scenario: "Prompt injection — ignore rules",
-    category: "Guardrails",
-    status: "pass",
-    taskSuccess: 1.0,
-    grounding: 1.0,
-    latencyMs: 510,
-    deltaVsBaseline: 0.0,
-    regressed: false,
-  },
-  {
-    id: "e4",
-    scenario: "Out-of-scope question — pricing",
-    category: "Guardrails",
-    status: "fail",
-    taskSuccess: 0.62,
-    grounding: 0.71,
-    latencyMs: 950,
-    deltaVsBaseline: -0.11,
-    regressed: true,
-  },
-  {
-    id: "e5",
-    scenario: "Multilingual — Spanish speaker",
-    category: "Languages",
-    status: "pass",
-    taskSuccess: 0.88,
-    grounding: 0.84,
-    latencyMs: 1100,
+    id: "run3",
+    timestamp: "2026-06-17 09:45",
+    status: "fail" as const,
+    passRate: 0.6,
+    groundingScore: 0.71,
+    p50LatencyMs: 950,
   },
 ];
 
 export default function EvalsPage() {
+  const latestRun = STUB_RUNS[0];
+  const failCount = STUB_RUNS.filter((r) => r.status === "fail").length;
+  const hasRegression = failCount > 0;
+
   return (
     <div className="mx-auto w-full max-w-5xl px-4 py-10 sm:px-6">
       <div className="mb-8 flex items-start gap-3">
         <FlaskConical className="mt-0.5 size-6 text-primary" />
         <div>
-          <h1 className="text-2xl font-bold">Eval Harness</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <h1 className="text-2xl font-bold text-balance">Eval Harness</h1>
+          <p className="mt-1 text-sm text-pretty text-muted-foreground">
             Scripted scenarios scored for grounding, task success, and regressions.
           </p>
         </div>
       </div>
 
-      {/* Staging banner */}
-      <div className="mb-6 flex items-start gap-3 rounded-xl border border-info/30 bg-info-subtle px-4 py-3">
-        <Info className="mt-0.5 size-4 shrink-0 text-info" />
-        <p className="text-sm text-info">
-          <span className="font-medium">Eval backend coming in a later workstream.</span> The table below shows
-          example scenarios to demonstrate the scoring UI — results are synthetic.
-          Live eval runs will replace these once the harness backend ships.
-        </p>
+      {hasRegression && (
+        <div className="mb-6 flex items-start gap-3 rounded-xl border border-danger/30 bg-danger-subtle/20 px-4 py-3">
+          <TrendingDown className="mt-0.5 size-4 shrink-0 text-danger" />
+          <p className="text-sm text-danger">
+            <span className="font-medium">Regression detected.</span> Latest run failed against baseline.
+          </p>
+        </div>
+      )}
+
+      <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <KpiTile label="Pass rate" value={`${Math.round(latestRun.passRate * 100)}%`} />
+        <KpiTile label="Grounding score" value={`${Math.round(latestRun.groundingScore * 100)}%`} />
+        <KpiTile label="p50 latency" value={`${latestRun.p50LatencyMs}ms`} />
+        <KpiTile label="Regressions" value={failCount.toString()} />
       </div>
 
       <section className="rounded-xl border bg-card p-5">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-sm font-semibold">Scenario results</h2>
-          <span className="rounded-full bg-secondary px-2.5 py-1 font-mono text-[11px] text-muted-foreground">
-            {STUB_ROWS.filter((r) => r.status === "pass").length}/{STUB_ROWS.length} passing
-          </span>
+        <h2 className="mb-4 text-sm font-semibold">Run history</h2>
+        <div className="overflow-hidden rounded-lg border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Timestamp</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Pass rate</TableHead>
+                <TableHead className="text-right">Grounding</TableHead>
+                <TableHead className="text-right">p50 latency</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {STUB_RUNS.map((run) => (
+                <TableRow key={run.id}>
+                  <TableCell className="text-sm">{run.timestamp}</TableCell>
+                  <TableCell>
+                    <EvalBadge status={run.status} />
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-sm tabular-nums">
+                    {Math.round(run.passRate * 100)}%
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-sm tabular-nums">
+                    {Math.round(run.groundingScore * 100)}%
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-sm tabular-nums">
+                    {run.p50LatencyMs}ms
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </div>
-        <EvalResults rows={STUB_ROWS} />
       </section>
+    </div>
+  );
+}
+
+function KpiTile({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border bg-card p-4">
+      <p className="text-xs font-medium text-muted-foreground">{label}</p>
+      <p className="mt-2 text-2xl font-bold tabular-nums">{value}</p>
     </div>
   );
 }
