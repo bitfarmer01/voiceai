@@ -1,0 +1,256 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+  VAPI Voice Receptionist — design system (ui-development-plan.md §2)
+  Calm-but-technical: slate neutrals + one restrained indigo/violet accent.
+  Semantic tokens only; light + dark parity (dark is tuned, not a naive invert).
+*/
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+  --font-heading: var(--font-sans);
+
+  /* surfaces */
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* semantic state colors (each ships a -subtle ~12% alpha fill) */
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-success-subtle: var(--success-subtle);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-warning-subtle: var(--warning-subtle);
+  --color-danger: var(--danger);
+  --color-danger-foreground: var(--danger-foreground);
+  --color-danger-subtle: var(--danger-subtle);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-info-subtle: var(--info-subtle);
+
+  /* FROZEN latency × cost encoding scale (same meaning app-wide) */
+  --color-latency-good: var(--latency-good); /* p50 < 500ms  */
+  --color-latency-ok: var(--latency-ok);     /* 500–900ms    */
+  --color-latency-slow: var(--latency-slow); /* 900–1500ms   */
+  --color-latency-bad: var(--latency-bad);   /* > 1500ms     */
+
+  /* charts (recharts / shadcn chart) — brand palette */
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  /* sidebar (kept for shadcn components) */
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* radius: sm 6 (chips) · md 8 (inputs/buttons) · lg 12 (cards) · xl 16 (modals) */
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.35);
+  --radius-2xl: calc(var(--radius) * 1.8);
+}
+
+:root {
+  --radius: 0.75rem; /* 12px lg */
+
+  --background: #fafafb;
+  --foreground: #0b0d12;
+  --card: #ffffff;
+  --card-foreground: #0b0d12;
+  --popover: #ffffff;
+  --popover-foreground: #0b0d12;
+
+  --primary: #4f46e5;
+  --primary-foreground: #ffffff;
+  --secondary: #f1f2f6;
+  --secondary-foreground: #0b0d12;
+  --muted: #f1f2f6;
+  --muted-foreground: #5a6173;
+  --accent: #eef0ff; /* indigo/violet wash for hovers + selected rows */
+  --accent-foreground: #312e81;
+
+  --border: #e7e8ec;
+  --input: #e7e8ec;
+  --ring: #4f46e5;
+
+  --destructive: #dc2626;
+
+  --success: #16a34a;
+  --success-foreground: #ffffff;
+  --success-subtle: rgba(22, 163, 74, 0.12);
+  --warning: #d97706;
+  --warning-foreground: #ffffff;
+  --warning-subtle: rgba(217, 119, 6, 0.12);
+  --danger: #dc2626;
+  --danger-foreground: #ffffff;
+  --danger-subtle: rgba(220, 38, 38, 0.12);
+  --info: #0ea5e9;
+  --info-foreground: #ffffff;
+  --info-subtle: rgba(14, 165, 233, 0.12);
+
+  --latency-good: #16a34a;
+  --latency-ok: #65a30d;
+  --latency-slow: #d97706;
+  --latency-bad: #dc2626;
+
+  --chart-1: #4f46e5;
+  --chart-2: #0ea5e9;
+  --chart-3: #16a34a;
+  --chart-4: #d97706;
+  --chart-5: #dc2626;
+
+  --sidebar: #ffffff;
+  --sidebar-foreground: #0b0d12;
+  --sidebar-primary: #4f46e5;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #eef0ff;
+  --sidebar-accent-foreground: #312e81;
+  --sidebar-border: #e7e8ec;
+  --sidebar-ring: #4f46e5;
+}
+
+.dark {
+  --background: #0b0d12;
+  --foreground: #fafafb;
+  --card: #14171f;
+  --card-foreground: #fafafb;
+  --popover: #14171f;
+  --popover-foreground: #fafafb;
+
+  --primary: #6366f1;
+  --primary-foreground: #ffffff;
+  --secondary: #1b1f2a;
+  --secondary-foreground: #fafafb;
+  --muted: #1b1f2a;
+  --muted-foreground: #9ca3b4;
+  --accent: #1e2233;
+  --accent-foreground: #c7d2fe;
+
+  --border: #232733;
+  --input: #232733;
+  --ring: #6366f1;
+
+  --destructive: #ef4444;
+
+  --success: #22c55e;
+  --success-foreground: #06210f;
+  --success-subtle: rgba(34, 197, 94, 0.14);
+  --warning: #f59e0b;
+  --warning-foreground: #231400;
+  --warning-subtle: rgba(245, 158, 11, 0.14);
+  --danger: #ef4444;
+  --danger-foreground: #2a0606;
+  --danger-subtle: rgba(239, 68, 68, 0.14);
+  --info: #38bdf8;
+  --info-foreground: #04212e;
+  --info-subtle: rgba(56, 189, 248, 0.14);
+
+  --latency-good: #22c55e;
+  --latency-ok: #84cc16;
+  --latency-slow: #f59e0b;
+  --latency-bad: #ef4444;
+
+  --chart-1: #6366f1;
+  --chart-2: #38bdf8;
+  --chart-3: #22c55e;
+  --chart-4: #f59e0b;
+  --chart-5: #ef4444;
+
+  --sidebar: #14171f;
+  --sidebar-foreground: #fafafb;
+  --sidebar-primary: #6366f1;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #1e2233;
+  --sidebar-accent-foreground: #c7d2fe;
+  --sidebar-border: #232733;
+  --sidebar-ring: #6366f1;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  html {
+    @apply font-sans;
+  }
+  /* all numbers/latencies/costs/IDs use tabular mono per §2 */
+  .font-mono {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* ── motion utilities (reduced-motion guarded below) ─────────────────────────── */
+@keyframes ticker {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.animate-ticker {
+  animation: ticker 36s linear infinite;
+}
+
+@keyframes orb-pulse {
+  0% { box-shadow: 0 0 28px 4px color-mix(in oklab, var(--primary) 18%, transparent); transform: scale(0.99); }
+  100% { box-shadow: 0 0 52px 14px color-mix(in oklab, var(--primary) 32%, transparent); transform: scale(1.02); }
+}
+.animate-orb {
+  animation: orb-pulse 4s ease-in-out infinite alternate;
+}
+
+@keyframes pulse-ring {
+  0% { transform: scale(0.7); opacity: 0.6; }
+  100% { transform: scale(2.4); opacity: 0; }
+}
+.animate-pulse-ring {
+  animation: pulse-ring 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+}
+
+@keyframes eq-bar {
+  0%, 100% { transform: scaleY(0.35); }
+  50% { transform: scaleY(1); }
+}
+
+/* prefers-reduced-motion: disable orb/waveform/pulses/shimmer/slides → instant */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
