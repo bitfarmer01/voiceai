@@ -80,7 +80,7 @@ export function CallReportClient({ id }: { id: string }) {
       stars,
       ttsProvider: (call as { ttsProvider?: string }).ttsProvider ?? "",
       ttsVoice: (call as { ttsVoice?: string }).ttsVoice,
-      visitorKey: visitorKey ?? undefined,
+      visitorKey: visitorKey || undefined,
     });
     setRateSubmitted(true);
   };
