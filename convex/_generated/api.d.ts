@@ -14,6 +14,7 @@ import type * as businesses from "../businesses.js";
 import type * as calls from "../calls.js";
 import type * as guard from "../guard.js";
 import type * as http from "../http.js";
+import type * as ingest from "../ingest.js";
 import type * as leads from "../leads.js";
 import type * as lib___fixtures___vapiEndOfCallReport from "../lib/__fixtures__/vapiEndOfCallReport.js";
 import type * as lib_vapiReport from "../lib/vapiReport.js";
@@ -41,6 +42,7 @@ declare const fullApi: ApiFromModules<{
   calls: typeof calls;
   guard: typeof guard;
   http: typeof http;
+  ingest: typeof ingest;
   leads: typeof leads;
   "lib/__fixtures__/vapiEndOfCallReport": typeof lib___fixtures___vapiEndOfCallReport;
   "lib/vapiReport": typeof lib_vapiReport;
