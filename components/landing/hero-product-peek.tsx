@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 /**
  * Static, on-brand preview of the 3-column mission control (left metrics · centre
  * agent orb · right trace waterfall). Reconciled from the Stitch hero peek into the
- * indigo design system. Pure CSS motion (reduced-motion guarded globally).
+ * blue design system. Pure CSS motion (reduced-motion guarded globally).
  */
 export function HeroProductPeek({ className }: { className?: string }) {
   return (
