@@ -6,8 +6,8 @@ import { internal } from "./_generated/api";
 // convex-test loads every function module for the mock backend.
 const modules = import.meta.glob("./**/*.ts");
 
-describe("seed conforms to the frozen schema", () => {
-  test("populates all seeded tables with valid rows", async () => {
+describe("seed conforms to the frozen schema and writes NO fabricated data", () => {
+  test("seeds only preset businesses + chunks + a zeroed budget", async () => {
     const t = convexTest(schema, modules);
 
     // If any insert violates schema, convexTest throws here.
@@ -23,31 +23,42 @@ describe("seed conforms to the frozen schema", () => {
       }),
     );
 
-    // Row-count invariants (mirror convex/seed.ts).
+    // Preset product content IS seeded (real businesses a visitor talks to).
     expect(businesses).toHaveLength(3);
     expect(chunks).toHaveLength(12); // 4 chunks × 3 presets
-    expect(providerStats).toHaveLength(8);
-    expect(calls).toHaveLength(3); // 3 demo calls — one per preset/outcome
-    expect(budget).toHaveLength(1); // singleton
-
-    // Referential integrity: every call's businessId is a real business.
-    const businessIds = new Set(businesses.map((b) => b._id));
-    for (const call of calls) {
-      expect(businessIds.has(call.businessId)).toBe(true);
+    for (const b of businesses) {
+      expect(b.kind).toBe("preset");
     }
 
-    // providerStats kinds are within the frozen ProviderKind enum.
-    for (const s of providerStats) {
-      expect(["stt", "tts", "llm"]).toContain(s.kind);
-      expect(["native", "custom"]).toContain(s.source);
-    }
+    // REAL-DATA-ONLY: zero fabricated calls and zero fabricated provider stats.
+    expect(calls).toHaveLength(0);
+    expect(providerStats).toHaveLength(0);
+
+    // budgetState is a single zeroed singleton — no fabricated spend.
+    expect(budget).toHaveLength(1);
+    expect(budget[0].totalSpentUsd).toBe(0);
+    expect(budget[0].daySpentUsd).toBe(0);
+    expect(budget[0].activeCalls).toBe(0);
   });
 
-  test("is idempotent — re-running yields identical row counts", async () => {
+  test("is idempotent — re-running yields identical (zero-fake) state", async () => {
     const t = convexTest(schema, modules);
     await t.mutation(internal.seed.seed, {});
     await t.mutation(internal.seed.seed, {});
-    const calls = await t.run((ctx) => ctx.db.query("calls").collect());
-    expect(calls).toHaveLength(3); // clear-then-insert, not append
+
+    const { businesses, calls, providerStats, budget } = await t.run(
+      async (ctx) => ({
+        businesses: await ctx.db.query("businesses").collect(),
+        calls: await ctx.db.query("calls").collect(),
+        providerStats: await ctx.db.query("providerStats").collect(),
+        budget: await ctx.db.query("budgetState").collect(),
+      }),
+    );
+
+    // clear-then-insert, not append.
+    expect(businesses).toHaveLength(3);
+    expect(calls).toHaveLength(0);
+    expect(providerStats).toHaveLength(0);
+    expect(budget).toHaveLength(1);
   });
 });

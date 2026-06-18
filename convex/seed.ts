@@ -1,15 +1,20 @@
 /**
- * FROZEN DAY-0 CONTRACT — convex/seed.ts
+ * REAL-DATA-ONLY SEED — convex/seed.ts
  *
- * Idempotent deterministic seed for the read-surfaces (leaderboard, recent
- * calls, analytics, budget). Produces rows equivalent to lib/data/mock.ts so
- * the UI renders comparable data the moment the deployment goes live.
+ * Seeds ONLY the preset sample businesses a visitor can talk to (real product
+ * content) plus their knowledge chunks, and a zeroed budget singleton. It NEVER
+ * writes fabricated calls, providerStats rollups, or non-zero budget spend —
+ * every number the UI shows must come from real, live calls.
  *
  * RULES:
  *   - Deterministic only. NO Date.now()/Math.random() — timestamps derive from
  *     the fixed BASE_EPOCH constant so two runs produce identical data.
  *   - Safe to run twice: clear-then-insert per seeded table.
  *   - internalMutation; object syntax; args {} and returns v.null().
+ *
+ * NOTE: re-running this clears `calls`, `providerStats`, and `budgetState`,
+ * which is destructive to any REAL call data already recorded. Only run on a
+ * fresh deployment, or when you intentionally want a clean slate.
  */
 import { internalMutation } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
@@ -24,6 +29,9 @@ export const seed = internalMutation({
   returns: v.null(),
   handler: async (ctx) => {
     // ── 0. Clear seeded tables (clear-then-insert → safe to re-run) ───────────────
+    // Only the tables this seed populates. `calls` and `providerStats` are cleared
+    // so a re-seed never leaves orphaned/fabricated rows — they start empty and
+    // fill exclusively from real calls. budgetState is reset to a zeroed singleton.
     for (const table of [
       "businesses",
       "knowledgeChunks",
@@ -37,6 +45,7 @@ export const seed = internalMutation({
     }
 
     // ── 1. Preset businesses ──────────────────────────────────────────────────────
+    // Real product content: the sample businesses a visitor talks to.
     const presets = [
       {
         name: "Glow Dental",
@@ -130,84 +139,14 @@ export const seed = internalMutation({
       }
     }
 
-    // ── 2. providerStats (mirror MOCK_PROVIDER_STATS) ─────────────────────────────
-    // Small DEMO numbers: callCount mirrors the 3 demo calls below; avgRating is a
-    // modest illustrative value. Shown behind a "Demo data" label, not measured usage.
-    const providerStats = [
-      { provider: "Deepgram Flux", kind: "stt", source: "native", p50LatencyMs: 240, p95LatencyMs: 410, costPerMin: 0.006, avgRating: 4.6, callCount: 1, languages: ["en", "es"] },
-      { provider: "AssemblyAI", kind: "stt", source: "native", p50LatencyMs: 380, p95LatencyMs: 620, costPerMin: 0.007, avgRating: 4.3, callCount: 1, languages: ["en"] },
-      { provider: "Fal.ai Whisper", kind: "stt", source: "custom", p50LatencyMs: 520, p95LatencyMs: 880, costPerMin: 0.004, avgRating: 4.1, callCount: 1, languages: ["en", "es", "fr"] },
-      { provider: "Cartesia Sonic-3", kind: "tts", source: "native", voice: "Sonic", p50LatencyMs: 290, p95LatencyMs: 520, costPerMin: 0.02, avgRating: 4.7, callCount: 1, languages: ["en", "es"] },
-      { provider: "ElevenLabs", kind: "tts", source: "native", voice: "Rachel", p50LatencyMs: 640, p95LatencyMs: 980, costPerMin: 0.05, avgRating: 4.8, callCount: 1, languages: ["en"] },
-      { provider: "Fal.ai Kokoro-82M", kind: "tts", source: "custom", voice: "Kokoro", p50LatencyMs: 720, p95LatencyMs: 1180, costPerMin: 0.003, avgRating: 4.0, callCount: 1, languages: ["en"] },
-      { provider: "GPT-4o mini", kind: "llm", source: "native", p50LatencyMs: 450, p95LatencyMs: 760, costPerMin: 0.015, avgRating: 4.5, callCount: 2, languages: ["en", "es", "fr"] },
-      { provider: "Groq Llama-3.3", kind: "llm", source: "native", p50LatencyMs: 210, p95LatencyMs: 390, costPerMin: 0.008, avgRating: 4.2, callCount: 1, languages: ["en"] },
-    ] as const;
+    // ── 2. providerStats: intentionally empty ─────────────────────────────────────
+    // No fabricated rollups. The leaderboard fills from real calls as they happen.
 
-    for (const s of providerStats) {
-      await ctx.db.insert("providerStats", {
-        provider: s.provider,
-        kind: s.kind,
-        source: s.source,
-        voice: "voice" in s ? (s as { voice?: string }).voice : undefined,
-        p50LatencyMs: s.p50LatencyMs,
-        p95LatencyMs: s.p95LatencyMs,
-        costPerMin: s.costPerMin,
-        avgRating: s.avgRating,
-        callCount: s.callCount,
-        languages: [...s.languages],
-      });
-    }
+    // ── 3. calls: intentionally empty ─────────────────────────────────────────────
+    // No demo/fake call history. Recent-calls, analytics, and leaderboard surfaces
+    // render honest empty/loading states until real calls are recorded.
 
-    // ── 3. Recent calls (mirror MOCK_RECENT_CALLS, 3 demo rows) ────────────────────
-    // Same deterministic formulas as lib/data/mock.ts, with startedAt resolved
-    // against BASE_EPOCH instead of render-time `now`. Preset businesses only —
-    // one demo call per preset, one per outcome.
-    const BUSINESSES = ["Glow Dental", "Lux Salon", "Hale & Park Law"];
-    const OUTCOMES = ["booked", "intent", "abandoned"] as const;
-    const STTS = ["Deepgram Flux", "AssemblyAI", "Fal.ai Whisper"];
-    const TTSS = ["Cartesia Sonic-3", "ElevenLabs", "Fal.ai Kokoro-82M"];
-    const TTS_VOICES: Record<string, string | undefined> = {
-      "Cartesia Sonic-3": "Sonic",
-      ElevenLabs: "Rachel",
-      "Fal.ai Kokoro-82M": "Kokoro",
-    };
-    const TTFW = [320, 540, 880, 1240];
-
-    for (let i = 0; i < 3; i++) {
-      const outcome = OUTCOMES[i % 3];
-      const businessName = BUSINESSES[i % BUSINESSES.length];
-      const stt = STTS[i % 3];
-      const tts = TTSS[i % 3];
-      const ttfw = TTFW[i % 4];
-      const startedAt = BASE_EPOCH - (i * 7 + 2) * 60_000; // "N minutes ago"
-      const durationSec = 45 + ((i * 17) % 70);
-      const businessId = businessIds[businessName];
-
-      await ctx.db.insert("calls", {
-        sessionId: `seed_session_${(i + 1).toString().padStart(4, "0")}`,
-        businessId,
-        businessName,
-        vapiCallId: `seed_vapi_${(i + 1).toString().padStart(4, "0")}`,
-        status: "ended",
-        outcome,
-        startedAt,
-        endedAt: startedAt + durationSec * 1000,
-        durationSec,
-        costUsd: 0.18 + (i % 5) * 0.04,
-        costBreakdown: { stt: 0.04, llm: 0.06, tts: 0.07, platform: 0.03 },
-        sttProvider: stt,
-        ttsProvider: tts,
-        ttsVoice: TTS_VOICES[tts],
-        llmProvider: i % 2 === 0 ? "GPT-4o mini" : "Groq Llama-3.3",
-        languages: i % 4 === 0 ? ["en", "es"] : ["en"],
-        ttfwMs: ttfw,
-        successEval: outcome === "booked",
-        visitorKey: `seed_visitor_${i % 5}`,
-      });
-    }
-
-    // ── 4. budgetState singleton (clean slate — no fabricated spend) ──────────────
+    // ── 4. budgetState singleton (zeroed — no fabricated spend) ───────────────────
     await ctx.db.insert("budgetState", {
       totalSpentUsd: 0,
       daySpentUsd: 0,
