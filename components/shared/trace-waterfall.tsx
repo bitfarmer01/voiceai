@@ -80,8 +80,11 @@ export function TraceWaterfall({ turns, className }: { turns: WaterfallTurn[]; c
                   title={`Time to first word: ${formatMs(turn.ttfwMs)}`}
                 />
               </div>
-              <span className={cn("w-14 shrink-0 text-right font-mono text-[10px] tabular-nums", latencyTextClass(turn.ttfwMs))}>
-                {formatMs(turn.totalMs)}
+              <span
+                className={cn("w-14 shrink-0 text-right font-mono text-[10px] tabular-nums", latencyTextClass(turn.ttfwMs))}
+                title="Time to first word"
+              >
+                {formatMs(turn.ttfwMs)}
               </span>
             </div>
           );

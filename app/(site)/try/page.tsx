@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useMutation, useQuery, useAction } from "convex/react";
-import { CheckCircle, FileText } from "@phosphor-icons/react";
+import { CheckCircle, FileText, ShieldCheck } from "@phosphor-icons/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { cn } from "@/lib/utils";
@@ -58,10 +58,10 @@ export default function TryPage() {
   const budget = useBudgetState();
   const visitorKey = useVisitorKey();
   const businesses = useQuery(api.businesses.listPresets);
-  const guard = useQuery(api.guard.canStartCall, visitorKey ? { visitorKey } : "skip");
+  const guard = useQuery(api.guard.canStartCall, {});
   const trackedCall = useQuery(
     api.calls.getById,
-    trackedCallId ? { callId: trackedCallId as Id<"calls"> } : "skip",
+    trackedCallId ? { callId: trackedCallId as Id<"calls">, visitorKey } : "skip",
   );
   const booking = bookingFromStructuredData(trackedCall?.structuredData);
 
@@ -190,7 +190,7 @@ export default function TryPage() {
           llmProvider: pipeline.llmId,
         });
         activeCallIdRef.current = callId;
-      setTrackedCallId(callId);
+        setTrackedCallId(callId);
         const assistant = buildAssistantFromConvexBusiness(uploadedBizQ, pipeline, {
           webhookUrl: WEBHOOK_URL,
           toolBaseUrl: SITE_URL || undefined,
@@ -478,22 +478,23 @@ export default function TryPage() {
             <h2 className="mb-3 text-sm font-semibold">Live trace</h2>
             {call.status === "live" ? (
               <p className="font-mono text-xs text-muted-foreground">
-                Streaming {call.turns.length} turn{call.turns.length === 1 ? "" : "s"} · the authoritative
-                per-turn STT→LLM→TTS waterfall attaches on the post-call report.
+                Streaming {call.turns.length} turn{call.turns.length === 1 ? "" : "s"}. The full breakdown appears in your post-call report.
               </p>
             ) : (
               <p className="text-xs text-muted-foreground">
-                Trace appears once the call starts — per-turn latency, off the audio critical path.
+                Timing details appear here once the call starts.
               </p>
             )}
           </section>
 
           <section className="rounded-xl border bg-card p-4">
             <h2 className="mb-2 text-sm font-semibold">Guardrails</h2>
+            <p className="mb-2 text-[11px] text-muted-foreground">Guarded against:</p>
             <div className="flex flex-wrap gap-1.5">
               {["Injection", "Hallucination", "Stay-in-role", "Abuse"].map((g) => (
-                <span key={g} className="rounded-full border border-success/20 bg-success-subtle px-2 py-0.5 text-[11px] text-success">
-                  {g} ✓
+                <span key={g} className="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
+                  <ShieldCheck className="size-3" aria-hidden />
+                  {g}
                 </span>
               ))}
             </div>

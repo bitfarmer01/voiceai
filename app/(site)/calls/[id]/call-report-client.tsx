@@ -70,7 +70,11 @@ export function CallReportClient({ id }: { id: string }) {
   const [rated, setRated] = React.useState(0);
   const [rateSubmitted, setRateSubmitted] = React.useState(false);
 
-  const call = useQuery(api.calls.getById, { callId });
+  // Ownership-gated (M2): getById only returns the PII-bearing call record to the
+  // visitor who owns it. We pass the persisted per-browser visitorKey that
+  // startCall stored on the call row, so the owner sees their report while a third
+  // party who opens the link (different visitorKey) gets null → "call not found".
+  const call = useQuery(api.calls.getById, { callId, visitorKey });
   const spans = useQuery(api.spans.listByTrace, { traceId: id });
   const turns = useQuery(api.transcriptTurns.listByCall, { callId });
   const rateMutation = useMutation(api.voiceRatings.rate);
@@ -181,7 +185,7 @@ export function CallReportClient({ id }: { id: string }) {
                 <p className="tabular-nums text-foreground">{formatDuration(c.durationSec)}</p>
               </div>
               <div>
-                <p className="text-muted-foreground">TTFW</p>
+                <p className="text-muted-foreground">First word</p>
                 <p className="tabular-nums text-foreground">{formatMs(c.ttfwMs ?? 0)}</p>
               </div>
               <div>

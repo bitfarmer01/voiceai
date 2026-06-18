@@ -6,10 +6,10 @@ import { formatUsd } from "@/lib/format";
 import type { CostBreakdown as CostBreakdownData } from "@/lib/types";
 
 const SEGMENTS: { key: keyof CostBreakdownData; label: string; cls: string }[] = [
-  { key: "stt", label: "STT", cls: "bg-latency-good" },
-  { key: "llm", label: "LLM", cls: "bg-latency-slow" },
-  { key: "tts", label: "TTS", cls: "bg-primary" },
-  { key: "platform", label: "Platform", cls: "bg-info" },
+  { key: "stt", label: "STT", cls: "bg-foreground/20" },
+  { key: "llm", label: "LLM", cls: "bg-foreground/35" },
+  { key: "tts", label: "TTS", cls: "bg-foreground/50" },
+  { key: "platform", label: "Platform", cls: "bg-foreground/65" },
 ];
 
 /**

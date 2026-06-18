@@ -91,7 +91,7 @@ export function BudgetMeter({
 
       {h === "reached" && (
         <p className="rounded-md bg-danger-subtle px-3 py-2 text-xs font-medium text-danger">
-          Budget reached — new calls are blocked. Every benchmark, trace, and eval is still explorable.
+          Budget limit reached. You can review past calls but can&apos;t start new ones.
         </p>
       )}
     </div>
