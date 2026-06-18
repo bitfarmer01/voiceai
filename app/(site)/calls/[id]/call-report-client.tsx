@@ -3,10 +3,12 @@
 import * as React from "react";
 import Link from "next/link";
 import { useQuery, useMutation } from "convex/react";
-import { ArrowLeft, Calendar, Download } from "lucide-react";
+import { ArrowLeft } from "@phosphor-icons/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { formatUsd, formatDuration, formatMs } from "@/lib/format";
+import { bookingFromStructuredData } from "@/lib/calls/booking";
+import { AppointmentCard } from "@/components/shared/appointment-card";
 import { TraceWaterfall } from "@/components/shared/trace-waterfall";
 import type { WaterfallTurn } from "@/components/shared/trace-waterfall";
 import { CostBreakdown } from "@/components/shared/cost-breakdown";
@@ -16,7 +18,6 @@ import { StarRating } from "@/components/shared/star-rating";
 import { EmptyState } from "@/components/states/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { useVisitorKey } from "@/lib/hooks/use-visitor-key";
 import type { SpanKind, TranscriptTurn } from "@/lib/types";
 
@@ -69,7 +70,16 @@ export function CallReportClient({ id }: { id: string }) {
   const [rated, setRated] = React.useState(0);
   const [rateSubmitted, setRateSubmitted] = React.useState(false);
 
-  const call = useQuery(api.calls.getById, { callId });
+  // Ownership-gated (M2): getById only returns the PII-bearing call record to the
+  // visitor who owns it. We pass the persisted per-browser visitorKey that
+  // startCall stored on the call row, so the owner sees their report while a third
+  // party who opens the link (different visitorKey) gets null → "call not found".
+  // Gate on a non-empty key ("skip" until useVisitorKey hydrates) so the owner
+  // doesn't see a one-frame "Call not found" flash before the real key loads.
+  const call = useQuery(
+    api.calls.getById,
+    visitorKey ? { callId, visitorKey } : "skip",
+  );
   const spans = useQuery(api.spans.listByTrace, { traceId: id });
   const turns = useQuery(api.transcriptTurns.listByCall, { callId });
   const rateMutation = useMutation(api.voiceRatings.rate);
@@ -140,12 +150,7 @@ export function CallReportClient({ id }: { id: string }) {
     text: t.text,
     ts: t.ts,
   }));
-  const booking =
-    c.structuredData &&
-    typeof c.structuredData === "object" &&
-    "booking" in (c.structuredData as Record<string, unknown>)
-      ? (c.structuredData as Record<string, unknown>).booking
-      : null;
+  const booking = bookingFromStructuredData(c.structuredData);
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6">
@@ -185,7 +190,7 @@ export function CallReportClient({ id }: { id: string }) {
                 <p className="tabular-nums text-foreground">{formatDuration(c.durationSec)}</p>
               </div>
               <div>
-                <p className="text-muted-foreground">TTFW</p>
+                <p className="text-muted-foreground">First word</p>
                 <p className="tabular-nums text-foreground">{formatMs(c.ttfwMs ?? 0)}</p>
               </div>
               <div>
@@ -198,28 +203,7 @@ export function CallReportClient({ id }: { id: string }) {
           {/* Booking */}
           {booking != null && (
             <section className="rounded-xl border bg-card p-5">
-              <div className="mb-3 flex items-center gap-2">
-                <Calendar className="size-4 text-success" />
-                <h2 className="text-sm font-semibold">Booking captured</h2>
-              </div>
-              <pre className="overflow-auto rounded-lg bg-secondary p-3 font-mono text-xs text-foreground">
-                {JSON.stringify(booking, null, 2)}
-              </pre>
-              <Button
-                variant="link"
-                size="sm"
-                className="mt-3 h-auto gap-1.5 p-0 text-xs"
-                onClick={() => {
-                  const blob = new Blob([JSON.stringify(booking, null, 2)], { type: "application/json" });
-                  const a = document.createElement("a");
-                  a.href = URL.createObjectURL(blob);
-                  a.download = `booking-${id}.json`;
-                  a.click();
-                }}
-              >
-                <Download className="size-3.5" />
-                Download booking
-              </Button>
+              <AppointmentCard booking={booking} />
             </section>
           )}
 

@@ -27,7 +27,7 @@ describe("seed conforms to the frozen schema", () => {
     expect(businesses).toHaveLength(3);
     expect(chunks).toHaveLength(12); // 4 chunks × 3 presets
     expect(providerStats).toHaveLength(8);
-    expect(calls).toHaveLength(12);
+    expect(calls).toHaveLength(3); // 3 demo calls — one per preset/outcome
     expect(budget).toHaveLength(1); // singleton
 
     // Referential integrity: every call's businessId is a real business.
@@ -48,6 +48,6 @@ describe("seed conforms to the frozen schema", () => {
     await t.mutation(internal.seed.seed, {});
     await t.mutation(internal.seed.seed, {});
     const calls = await t.run((ctx) => ctx.db.query("calls").collect());
-    expect(calls).toHaveLength(12); // clear-then-insert, not append
+    expect(calls).toHaveLength(3); // clear-then-insert, not append
   });
 });

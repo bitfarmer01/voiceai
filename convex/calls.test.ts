@@ -39,22 +39,22 @@ test("startCall: inserts a call row and bumps activeCalls", async () => {
   expect(count).toBe(1);
 });
 
-test("startCall: throws call_blocked:visitor_cap after 2 calls for the same visitor", async () => {
+test("startCall: no per-visitor daily cap — the same visitor can start multiple calls", async () => {
   const t = convexTest(schema, modules);
   const businessId = await seedAndGetBusinessId(t);
 
   await startOne(t, businessId, "v1", "-a");
   await startOne(t, businessId, "v1", "-b");
-
-  await expect(startOne(t, businessId, "v1", "-c")).rejects.toThrow(
-    "call_blocked:visitor_cap",
-  );
+  // Pre-removal this third call threw call_blocked:visitor_cap; now it succeeds
+  // (still bounded only by the concurrency cap of 3).
+  const third = await startOne(t, businessId, "v1", "-c");
+  expect(third).toBeTruthy();
 
   const count = await t.query(api.calls.activeCount, {});
-  expect(count).toBe(2);
+  expect(count).toBe(3);
 });
 
-test("startCall: visitor cap is per-visitor — different visitors are independent", async () => {
+test("startCall: different visitors can each start calls", async () => {
   const t = convexTest(schema, modules);
   const businessId = await seedAndGetBusinessId(t);
 
@@ -100,6 +100,28 @@ test("startCall: throws call_blocked:total_budget when global cap hit", async ()
   await expect(startOne(t, businessId, "v1")).rejects.toThrow(
     "call_blocked:total_budget",
   );
+});
+
+test("getById: returns the row for the owning visitorKey and null for a non-owner", async () => {
+  const t = convexTest(schema, modules);
+  const businessId = await seedAndGetBusinessId(t);
+  // startOne stores visitorKey = "v1" on the call row.
+  const callId = await startOne(t, businessId, "v1");
+
+  const owned = await t.query(api.calls.getById, {
+    callId,
+    visitorKey: "v1",
+  });
+  expect(owned).not.toBeNull();
+  expect(owned._id).toBe(callId);
+
+  // A caller holding the callId but not the owning visitorKey gets null —
+  // the call's PII (structuredData.booking) is never exposed cross-visitor.
+  const denied = await t.query(api.calls.getById, {
+    callId,
+    visitorKey: "someone-elses-visitor",
+  });
+  expect(denied).toBeNull();
 });
 
 test("startCall: throws business_not_found for unknown businessId", async () => {

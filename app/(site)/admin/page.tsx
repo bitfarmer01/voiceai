@@ -1,6 +1,6 @@
 "use client";
 
-import { Lock } from "lucide-react";
+import { Lock } from "@phosphor-icons/react";
 import { useQuery } from "convex/react";
 import Link from "next/link";
 import { api } from "@/convex/_generated/api";
@@ -23,12 +23,12 @@ const ENABLED = process.env.NEXT_PUBLIC_ADMIN_ENABLED === "true";
 export default function AdminPage() {
   if (!ENABLED) {
     return (
-      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 text-center">
-        <Lock className="size-8 text-muted-foreground" />
-        <h1 className="text-xl font-bold">Admin access restricted</h1>
-        <p className="max-w-xs text-sm text-muted-foreground">
-          Set <code className="rounded bg-secondary px-1.5 py-0.5 font-mono text-xs">NEXT_PUBLIC_ADMIN_ENABLED=true</code> in your environment to enable this page.
-        </p>
+      <div className="flex min-h-[60dvh] items-center justify-center">
+        <EmptyState
+          icon={Lock}
+          title="Admin access restricted"
+          description="Set NEXT_PUBLIC_ADMIN_ENABLED=true in your environment to enable this page."
+        />
       </div>
     );
   }

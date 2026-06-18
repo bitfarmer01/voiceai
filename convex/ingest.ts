@@ -4,15 +4,21 @@ import { action } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
+import { z } from "zod";
+import {
+  sanitizeProfile,
+  businessProfileSchema,
+  isImageMime,
+  toDataUrl,
+  buildExtractionPrompt,
+  buildOcrPrompt,
+} from "./lib/ingest_helpers";
 
 const NIM_BASE_URL = "https://integrate.api.nvidia.com/v1";
 const NIM_MODEL = "nvidia/nemotron-3-nano-30b-a3b";
+const NIM_VLM_MODEL = "nvidia/llama-3.1-nemotron-nano-vl-8b-v1";
 const MAX_FILE_BYTES = 5 * 1024 * 1024; // 5 MB
 const MAX_TEXT_CHARS = 50_000;
-
-function sanitize(s: string): string {
-  return s.replace(/^(ignore\b|you are\b|system:|<|forget\b)/gim, "[redacted]").trim();
-}
 
 async function extractText(buffer: Buffer, mimeType: string): Promise<string> {
   if (mimeType === "application/pdf") {
@@ -51,11 +57,40 @@ export const ingestDocument = action({
     const buffer = Buffer.from(arrayBuffer);
 
     let rawText: string;
-    try {
-      rawText = await extractText(buffer, args.mimeType);
-    } catch {
-      throw new Error("ingest_failed: could not parse file content");
+    if (isImageMime(args.mimeType)) {
+      try {
+        const { createOpenAI } = await import("@ai-sdk/openai");
+        const { generateText } = await import("ai");
+        const nimVlm = createOpenAI({
+          baseURL: NIM_BASE_URL,
+          apiKey: process.env.NVIDIA_NIM_API_KEY ?? "",
+        });
+        const { text } = await generateText({
+          model: nimVlm(NIM_VLM_MODEL),
+          messages: [
+            {
+              role: "user",
+              content: [
+                { type: "image", image: toDataUrl(buffer, args.mimeType) },
+                { type: "text", text: buildOcrPrompt() },
+              ],
+            },
+          ],
+        });
+        rawText = text;
+      } catch {
+        // VLM 5xx / missing key / network error — normalize to the ingest_failed
+        // contract instead of leaking a raw SDK error.
+        throw new Error("ingest_failed: could not read image content");
+      }
+    } else {
+      try {
+        rawText = await extractText(buffer, args.mimeType);
+      } catch {
+        throw new Error("ingest_failed: could not parse file content");
+      }
     }
+
     if (rawText.trim().length < 50) {
       throw new Error("ingest_failed: too little text extracted from file");
     }
@@ -63,7 +98,6 @@ export const ingestDocument = action({
 
     const { createOpenAI } = await import("@ai-sdk/openai");
     const { generateObject } = await import("ai");
-    const { z } = await import("zod");
 
     const nim = createOpenAI({
       baseURL: NIM_BASE_URL,
@@ -72,29 +106,17 @@ export const ingestDocument = action({
 
     const { object } = await generateObject({
       model: nim(NIM_MODEL),
-      schema: z.object({
-        companyName: z.string().max(120),
-        hours: z.string().max(200),
-        services: z.array(z.string().max(80)).max(10),
-        policies: z.array(z.string().max(200)).max(10),
-        availability: z.string().max(200),
-        chunks: z
-          .array(
-            z.object({
-              text: z.string().max(400),
-              tags: z.array(z.string().max(40)).max(5),
-            }),
-          )
-          .max(20),
-      }),
-      prompt: [
-        "Extract a structured business profile from the following business document.",
-        "Return valid JSON with the schema provided.",
-        "chunks: up to 20 FAQ/policy sentences a phone receptionist would use to answer caller questions.",
-        "",
-        "Document:",
-        text,
-      ].join("\n"),
+      schema: businessProfileSchema(z),
+      prompt: buildExtractionPrompt(text),
+    });
+
+    const sanitized = sanitizeProfile({
+      companyName: object.companyName,
+      hours: object.hours,
+      services: object.services,
+      policies: object.policies,
+      availability: object.availability,
+      chunks: object.chunks,
     });
 
     const businessId = await ctx.runMutation(
@@ -104,15 +126,7 @@ export const ingestDocument = action({
         storageId: args.storageId,
         fileName: args.fileName,
         mimeType: args.mimeType,
-        companyName: sanitize(object.companyName),
-        hours: sanitize(object.hours),
-        services: object.services.map(sanitize),
-        policies: object.policies.map(sanitize),
-        availability: sanitize(object.availability),
-        chunks: object.chunks.map((c) => ({
-          text: sanitize(c.text),
-          tags: c.tags,
-        })),
+        ...sanitized,
       },
     );
 

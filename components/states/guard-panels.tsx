@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { Clock, Mic, MicOff, Trophy, Users, Wallet } from "lucide-react";
+import { Clock, Microphone, MicrophoneSlash, Trophy, Users, Wallet } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -86,8 +86,8 @@ export function VisitorCapPanel({ resetsInMs }: { resetsInMs: number }) {
 export function DailyBudgetPanel() {
   return (
     <GuardPanel tone="warning" icon={Wallet} title="$8 daily budget reached">
-      We cap daily spend to keep this free. Try again tomorrow — every benchmark, trace, and eval
-      is still fully explorable.
+      We cap daily spend to keep this demo free. Try again tomorrow. You can still browse past calls
+      and provider comparisons.
     </GuardPanel>
   );
 }
@@ -105,7 +105,7 @@ export function TotalBudgetPanel() {
         </Button>
       }
     >
-      Voice is paused — but every benchmark, trace, and eval is still explorable.
+      Voice is paused for now, but you can still browse all the past calls and comparisons.
     </GuardPanel>
   );
 }
@@ -116,7 +116,7 @@ export function MicPermissionPanel({ denied = false, onRequest }: { denied?: boo
     return (
       <GuardPanel
         tone="danger"
-        icon={MicOff}
+        icon={MicrophoneSlash}
         title="Microphone access is blocked"
         action={
           <Button variant="outline" size="sm" onClick={onRequest}>
@@ -131,7 +131,7 @@ export function MicPermissionPanel({ denied = false, onRequest }: { denied?: boo
   return (
     <GuardPanel
       tone="info"
-      icon={Mic}
+      icon={Microphone}
       title="Microphone needed"
       action={
         <Button size="sm" onClick={onRequest}>
@@ -161,7 +161,7 @@ export function ConsentDialog({
         <DialogHeader>
           <DialogTitle>Before we start the call</DialogTitle>
           <DialogDescription>
-            This demo records the call to produce your transcript, trace, and replay. PII is
+            This demo records the call to produce your transcript and a replay. PII is
             redacted before logging and everything auto-purges after 24 hours.
           </DialogDescription>
         </DialogHeader>
@@ -196,7 +196,7 @@ export function ConsentDialog({
 // 7 — Time cap (in-call 120s wrap-up toast)
 export function notifyTimeCap(secondsLeft = 15) {
   toast.warning("Wrapping up soon", {
-    description: `This demo call ends in ${secondsLeft}s (120-second cap). Your report will be ready right after.`,
+    description: `This demo call ends in ${secondsLeft}s. Your report will be ready right after.`,
     duration: 6000,
   });
 }

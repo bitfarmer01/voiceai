@@ -1,13 +1,16 @@
 import {
   Bookmark,
-  CheckCircle2,
+  CheckCircle,
   Circle,
-  CircleDot,
-  PhoneOff,
+  PhoneSlash,
   XCircle,
-} from "lucide-react";
+} from "@phosphor-icons/react/dist/ssr";
 import { cn } from "@/lib/utils";
 import type { CallStatus, CallOutcome, EvalStatus } from "@/lib/types";
+
+function CircleFill({ className }: { className?: string }) {
+  return <Circle weight="fill" className={className} />;
+}
 
 /**
  * Frozen StatusBadge vocabulary (ui-development-plan.md §2). Icon + label are ALWAYS
@@ -19,9 +22,9 @@ const base =
 
 const CALL: Record<CallStatus, { label: string; cls: string; icon: React.ElementType; pulse?: boolean }> = {
   idle: { label: "Idle", cls: "border-border bg-muted text-muted-foreground", icon: Circle },
-  connecting: { label: "Connecting", cls: "border-info/20 bg-info-subtle text-info", icon: CircleDot, pulse: true },
-  live: { label: "Live", cls: "border-success/20 bg-success-subtle text-success", icon: CircleDot, pulse: true },
-  ended: { label: "Ended", cls: "border-border bg-muted text-muted-foreground", icon: PhoneOff },
+  connecting: { label: "Connecting", cls: "border-info/20 bg-info-subtle text-info", icon: CircleFill, pulse: true },
+  live: { label: "Live", cls: "border-success/20 bg-success-subtle text-success", icon: CircleFill, pulse: true },
+  ended: { label: "Ended", cls: "border-border bg-muted text-muted-foreground", icon: PhoneSlash },
 };
 
 export function CallStatusBadge({ status, className }: { status: CallStatus; className?: string }) {
@@ -36,7 +39,7 @@ export function CallStatusBadge({ status, className }: { status: CallStatus; cla
 }
 
 const OUTCOME: Record<CallOutcome, { label: string; cls: string; icon: React.ElementType }> = {
-  booked: { label: "Booked", cls: "border-success/20 bg-success-subtle text-success", icon: CheckCircle2 },
+  booked: { label: "Booked", cls: "border-success/20 bg-success-subtle text-success", icon: CheckCircle },
   intent: { label: "Intent", cls: "border-info/20 bg-info-subtle text-info", icon: Bookmark },
   abandoned: { label: "Abandoned", cls: "border-warning/20 bg-warning-subtle text-warning", icon: Circle },
 };
@@ -62,7 +65,7 @@ export function EvalBadge({ status, className }: { status: EvalStatus; className
         className,
       )}
     >
-      {pass ? <CheckCircle2 className="size-3" /> : <XCircle className="size-3" />}
+      {pass ? <CheckCircle className="size-3" /> : <XCircle className="size-3" />}
       {pass ? "PASS" : "FAIL"}
     </span>
   );

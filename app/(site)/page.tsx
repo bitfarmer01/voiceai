@@ -1,160 +1,199 @@
 import Link from "next/link";
 import {
-  Activity,
   ArrowRight,
   CalendarCheck,
+  ChatCircle,
   FileText,
-  FlaskConical,
-  Gauge,
   Lock,
-  MessageSquare,
-  PhoneCall,
+  Phone,
   ShieldCheck,
-  Trophy,
   Wallet,
-} from "lucide-react";
+} from "@phosphor-icons/react/dist/ssr";
 import { Button } from "@/components/ui/button";
-import { LiveSignalChip } from "@/components/landing/live-signal-chip";
-import { RecentCallsTicker } from "@/components/landing/recent-calls-ticker";
-import { HeroProductPeek } from "@/components/landing/hero-product-peek";
+import { VoiceVisualizer } from "@/components/shared/voice-visualizer";
 
 export default function LandingPage() {
   return (
     <div className="flex flex-col">
-      {/* ── Hero ─────────────────────────────────────────────────────────── */}
-      <section className="mx-auto flex w-full max-w-7xl flex-col items-center px-4 pt-16 text-center sm:px-6 lg:pt-24">
-        <LiveSignalChip />
-        <p className="mt-8 font-mono text-xs uppercase tracking-[0.2em] text-primary">
-          Document-grounded · Web-only · No signup
-        </p>
-        <h1 className="mt-4 max-w-4xl text-4xl font-extrabold leading-[1.08] tracking-tight sm:text-5xl lg:text-6xl">
-          Talk to an AI receptionist that{" "}
-          <span className="text-muted-foreground">actually knows the business.</span>
-        </h1>
-        <p className="mt-6 max-w-2xl text-lg text-muted-foreground">
-          Pick or upload a business document, then talk live in your browser. It answers FAQs
-          from the doc, books appointments, and captures intent — with production observability,
-          provider benchmarking, evals, and a hard budget guard all visible.
-        </p>
-        <div className="mt-9 flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
-          <Button asChild size="lg" className="gap-2">
-            <Link href="/try">
-              <PhoneCall className="size-4" />
-              Talk to a receptionist
-            </Link>
-          </Button>
-          <Button asChild size="lg" variant="outline">
-            <Link href="#how-it-works">See how it works</Link>
-          </Button>
+      {/* ── Hero: copy + a live call card (real component, not a fake screenshot) ── */}
+      <section className="mx-auto grid w-full max-w-6xl items-center gap-12 px-4 pt-20 pb-16 sm:px-6 lg:grid-cols-[1.05fr_0.95fr] lg:gap-16 lg:pt-24">
+        <div>
+          <h1 className="max-w-[15ch] text-balance text-4xl leading-[1.03] font-bold sm:text-5xl lg:text-6xl">
+            The receptionist that never misses a call.
+          </h1>
+          <p className="mt-6 max-w-md text-pretty text-lg text-muted-foreground">
+            It answers questions about your business, books appointments, and takes messages. Live in
+            your browser, no signup.
+          </p>
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+            <Button asChild size="lg" className="gap-2">
+              <Link href="/try">
+                <Phone weight="fill" className="size-4" />
+                Hear it answer
+              </Link>
+            </Button>
+            <Button asChild size="lg" variant="outline">
+              <Link href="#how-it-works">See how it works</Link>
+            </Button>
+          </div>
         </div>
-        <p className="mt-4 font-mono text-xs text-muted-foreground">
-          No signup · 120-second demo call · Mic asked once
-        </p>
 
-        <HeroProductPeek className="mt-16" />
+        <CallCard />
       </section>
 
-      {/* ── How it works ─────────────────────────────────────────────────── */}
-      <section id="how-it-works" className="mx-auto w-full max-w-5xl scroll-mt-20 px-4 py-24 sm:px-6">
-        <h2 className="text-center text-2xl font-bold tracking-tight">How it works</h2>
-        <div className="relative mt-14 grid grid-cols-1 gap-10 md:grid-cols-3">
-          <div className="pointer-events-none absolute left-[16%] right-[16%] top-6 hidden h-px bg-border md:block" />
+      {/* ── Trust band (three plain claims, vertical rules, no decorative dots) ── */}
+      <section className="border-y bg-secondary/40">
+        <div className="mx-auto grid max-w-6xl grid-cols-1 divide-y divide-border px-4 sm:grid-cols-3 sm:divide-x sm:divide-y-0 sm:px-6">
           {[
-            { n: "01", icon: FileText, title: "Pick or upload a doc", body: "Choose a preset business or drop a PDF/DOCX. We extract a Business Profile + FAQ knowledge in seconds." },
-            { n: "02", icon: MessageSquare, title: "Talk in the browser", body: "Grant the mic and speak live over WebRTC. The receptionist is grounded strictly in your document." },
-            { n: "03", icon: CalendarCheck, title: "Get a booking + report", body: "Walk away with a structured booking (.ics), captured intent, and a full trace + cost report." },
-          ].map((s) => (
-            <div key={s.n} className="relative flex flex-col items-center text-center">
-              <div className="flex size-12 items-center justify-center rounded-lg border bg-card shadow-sm">
-                <s.icon className="size-5 text-primary" />
-              </div>
-              <span className="mt-4 font-mono text-xs text-muted-foreground">{s.n}</span>
-              <h3 className="mt-1 text-lg font-semibold">{s.title}</h3>
-              <p className="mt-2 text-sm text-muted-foreground">{s.body}</p>
+            ["Answers in under a second", "No hold music, no phone tree."],
+            ["Works around the clock", "Evenings, weekends, and every busy lunch rush."],
+            ["Nothing to install", "It runs in the browser. Your callers just talk."],
+          ].map(([h, b]) => (
+            <div key={h} className="px-2 py-8 sm:px-8">
+              <p className="font-medium">{h}</p>
+              <p className="mt-1 text-sm text-muted-foreground">{b}</p>
             </div>
           ))}
         </div>
       </section>
 
-      {/* ── Built like production (bento) ────────────────────────────────── */}
-      <section className="border-y bg-secondary/40">
-        <div className="mx-auto w-full max-w-7xl px-4 py-24 sm:px-6">
-          <div className="max-w-2xl">
-            <h2 className="text-3xl font-bold tracking-tight">Built like production.</h2>
-            <p className="mt-3 text-lg text-muted-foreground">
-              No black boxes. Live tracing, hot-swappable providers, eval-driven development, and a
-              hard spend guard are surfaced as first-class UI — not buried.
+      {/* ── How it works: three steps, verb headings, connected rail ── */}
+      <section id="how-it-works" className="mx-auto w-full max-w-5xl scroll-mt-20 px-4 py-24 sm:px-6">
+        <h2 className="max-w-xl text-3xl font-bold sm:text-4xl">Set it up in three steps.</h2>
+        <div className="relative mt-14 grid grid-cols-1 gap-12 md:grid-cols-3 md:gap-8">
+          <div className="pointer-events-none absolute inset-x-[16%] top-5 hidden h-px bg-border md:block" />
+          {[
+            {
+              icon: FileText,
+              title: "Add your business",
+              body: "Pick a sample business or paste your own details. It learns your hours, services, and prices.",
+            },
+            {
+              icon: Phone,
+              title: "Let it answer",
+              body: "Callers just talk. It listens, answers from your information, and asks the right follow-up questions.",
+            },
+            {
+              icon: CalendarCheck,
+              title: "Get the booking",
+              body: "You receive the appointment, a calendar invite, and a plain-English summary of every call.",
+            },
+          ].map((s) => (
+            <div key={s.title} className="relative">
+              <div className="flex size-11 items-center justify-center rounded-xl border bg-card shadow-sm">
+                <s.icon weight="regular" className="size-5 text-primary" />
+              </div>
+              <h3 className="mt-5 text-xl font-semibold">{s.title}</h3>
+              <p className="mt-2 text-pretty text-muted-foreground">{s.body}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── What it does on every call: editorial 2-col list, not a card grid ── */}
+      <section className="border-t bg-secondary/40">
+        <div className="mx-auto grid w-full max-w-6xl gap-12 px-4 py-24 sm:px-6 lg:grid-cols-[0.8fr_1.2fr] lg:gap-20">
+          <div className="lg:sticky lg:top-24 lg:self-start">
+            <h2 className="text-3xl font-bold text-balance sm:text-4xl">
+              Everything a great receptionist does, on every call.
+            </h2>
+            <p className="mt-4 text-pretty text-muted-foreground">
+              It stays inside what you tell it, so it is helpful without ever overpromising.
             </p>
+            <Link
+              href="/leaderboard"
+              className="mt-6 inline-flex items-center gap-1.5 text-sm font-medium text-foreground underline decoration-primary decoration-2 underline-offset-4 transition-colors hover:text-primary"
+            >
+              Want the technical detail? See live traces and benchmarks
+              <ArrowRight weight="bold" className="size-3.5 text-primary" />
+            </Link>
           </div>
 
-          <div className="mt-12 grid auto-rows-[200px] grid-cols-1 gap-4 md:grid-cols-3">
-            <FeatureCard
-              href="/calls"
-              icon={Activity}
-              title="Live tracing"
-              body="Per-turn STT → LLM → tool → TTS waterfall with time-to-first-word. Every millisecond accounted for."
-              className="md:col-span-2"
-            />
-            <FeatureCard href="/leaderboard" icon={Trophy} title="Provider leaderboard" body="Latency × cost × rated quality across 6+ providers — plus a custom Fal.ai adapter." />
-            <FeatureCard href="/evals" icon={FlaskConical} title="Eval harness" body="Scripted scenarios scored for grounding, task success, and regressions." />
-            <FeatureCard
-              href="/analytics"
-              icon={Wallet}
-              title="$40 budget guard"
-              body="Hard global cap, $8/day, 2 calls/visitor, 3 concurrent, 120s/call — each with a graceful UI state."
-              accent="warning"
-            />
-            <FeatureCard href="/try" icon={ShieldCheck} title="Guardrails" body="Prompt-injection defense, anti-hallucination, stay-in-role refusal — each fired event surfaced." />
-          </div>
+          <dl className="divide-y divide-border">
+            {[
+              {
+                icon: FileText,
+                title: "Answers from your own information",
+                body: "It only uses the details you give it, so it never invents hours, prices, or policies.",
+              },
+              {
+                icon: CalendarCheck,
+                title: "Books the appointment",
+                body: "It checks what is open, schedules the caller, and sends a calendar invite automatically.",
+              },
+              {
+                icon: ChatCircle,
+                title: "Takes a message when it cannot help",
+                body: "It captures who called and what they needed, so you can follow up at a good time.",
+              },
+              {
+                icon: Wallet,
+                title: "Stays on budget",
+                body: "Clear spending caps you can watch, so a busy day never turns into a surprise bill.",
+              },
+              {
+                icon: ShieldCheck,
+                title: "Never goes off-script",
+                body: "It politely declines anything outside your business and makes no promises you did not approve.",
+              },
+            ].map((f) => (
+              <div key={f.title} className="flex gap-4 py-6">
+                <f.icon weight="regular" className="mt-0.5 size-6 shrink-0 text-primary" />
+                <div>
+                  <dt className="font-semibold">{f.title}</dt>
+                  <dd className="mt-1 text-pretty text-muted-foreground">{f.body}</dd>
+                </div>
+              </div>
+            ))}
+          </dl>
         </div>
       </section>
 
-      {/* ── Recent calls ticker ──────────────────────────────────────────── */}
-      <section className="border-b py-5">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6">
-          <RecentCallsTicker />
-        </div>
-      </section>
-
-      {/* ── Privacy trust band ───────────────────────────────────────────── */}
-      <section className="mx-auto w-full max-w-3xl px-4 py-16 text-center sm:px-6">
-        <Lock className="mx-auto size-5 text-muted-foreground" />
-        <p className="mx-auto mt-3 max-w-xl text-sm text-muted-foreground">
-          <span className="font-medium text-foreground">Secure by default.</span> Recording consent
-          shown before the first call. PII is redacted before logging. Uploaded docs, transcripts,
-          and audio auto-purge after 24 hours.
+      {/* ── Closing CTA ── */}
+      <section className="mx-auto w-full max-w-3xl px-4 py-28 text-center sm:px-6">
+        <h2 className="text-balance text-3xl font-bold sm:text-4xl">Hear it answer a call.</h2>
+        <p className="mx-auto mt-4 max-w-md text-pretty text-muted-foreground">
+          Try a live demo in your browser. It takes about a minute, and you do not need an account.
         </p>
+        <Button asChild size="lg" className="mt-8 gap-2">
+          <Link href="/try">
+            <Phone weight="fill" className="size-4" />
+            Hear it answer
+          </Link>
+        </Button>
+      </section>
+
+      {/* ── Privacy band ── */}
+      <section className="border-t">
+        <div className="mx-auto flex w-full max-w-3xl items-start gap-3 px-4 py-12 text-sm text-muted-foreground sm:px-6">
+          <Lock weight="regular" className="mt-0.5 size-5 shrink-0" />
+          <p className="text-pretty">
+            <span className="font-medium text-foreground">Private by default.</span> Every caller is
+            told the call is recorded before it starts. Personal details are kept out of the logs, and
+            recordings, transcripts, and any uploads are deleted after 24 hours.
+          </p>
+        </div>
       </section>
     </div>
   );
 }
 
-function FeatureCard({
-  href,
-  icon: Icon,
-  title,
-  body,
-  className,
-  accent = "primary",
-}: {
-  href: string;
-  icon: React.ComponentType<{ className?: string }>;
-  title: string;
-  body: string;
-  className?: string;
-  accent?: "primary" | "warning";
-}) {
+/** Live call card: a real component preview, the synthetic conversation visualizer. */
+function CallCard() {
   return (
-    <Link
-      href={href}
-      className={`group relative flex flex-col overflow-hidden rounded-xl border bg-card p-6 transition-colors hover:border-primary/40 ${className ?? ""}`}
-    >
-      <Icon className={accent === "warning" ? "size-5 text-warning" : "size-5 text-primary"} />
-      <h3 className="mt-4 text-lg font-bold">{title}</h3>
-      <p className="mt-2 max-w-md text-sm text-muted-foreground">{body}</p>
-      <span className="mt-auto inline-flex items-center gap-1 text-sm font-medium text-primary opacity-0 transition-opacity group-hover:opacity-100">
-        View <ArrowRight className="size-3.5" />
-      </span>
-    </Link>
+    <div className="rounded-2xl bg-foreground p-6 text-background shadow-lg">
+      <div className="flex items-center font-mono text-[11px] text-background/60">
+        <span className="flex items-center gap-2">
+          <span className="size-2 rounded-full bg-primary shadow-[0_0_0_2px] shadow-primary/15" />
+          On a call
+        </span>
+      </div>
+      <div className="h-44">
+        <VoiceVisualizer mode="demo" bars={5} className="h-full" />
+      </div>
+      <p className="text-center text-sm text-background/70">
+        Answering a question, then booking the appointment.
+      </p>
+    </div>
   );
 }

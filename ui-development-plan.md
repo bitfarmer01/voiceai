@@ -41,31 +41,35 @@ guardrails are surfaced as first-class UI, not buried.
 *Route: `_foundation` — applies globally via the app shell; no standalone route.*
 
 The single source of visual + interaction truth that Stitch and Lovable consume so all generated screens stay
-coherent, accessible, and on-brand. Aesthetic: **calm-but-technical**, near-monochrome slate with one
-restrained indigo/violet accent, mono for all numbers/IDs.
+coherent, accessible, and on-brand. Identity: **Signal Bold** (locked — see `memory.md`): warm paper + ink,
+near-monochrome, with ONE restrained amber accent; mono for all numbers/IDs; **Phosphor** icons (not lucide).
 
 ### Color tokens (light + dark parity)
 - **Neutral surface ramp** — `--background, --foreground, --card, --popover, --muted, --muted-foreground,
-  --border, --input, --ring`. Light bg `#FAFAFB`, card `#FFFFFF`, border `#E7E8EC`; dark bg `#0B0D12`, card
-  `#14171F`, border `#232733`. Tuned so card-on-background lift reads in both themes.
-- **Brand accent ramp** — `--primary` (indigo `#4F46E5` light / `#6366F1` dark), `--primary-foreground`,
-  `--accent` (violet wash for hovers/selected rows). Drives CTAs, active nav, focus ring, AgentStage orb base.
-  → maps to `<CallController>`, `<AgentStage>`.
+  --border, --input, --ring`. Light: warm paper bg `#F4F4EE`, ink fg `#121210`, card `#FFFFFF`, border
+  `#E1E1D8`, muted `#EAEAE1`; dark bg `#121210`, card `#1B1B17`, border `#2A2A24`. Tuned so card-on-background
+  lift reads in both themes.
+- **Brand accent ramp** — `--primary` (amber `#EA580C` light / `#F97316` dark), `--primary-foreground`
+  (ink `#1A1206` — ink-on-amber passes WCAG AA; white-on-amber fails), `--accent` (warm amber wash `#FBECE1`
+  light / `#2A1A10` dark for hovers/selected rows). One accent only — no second hue. Drives CTAs, active nav,
+  focus ring, and the live `VoiceVisualizer`. → maps to `<CallController>`, `<VoiceVisualizer>`.
 - **Semantic state colors** — success `#16A34A/#22C55E` (booked, pass, healthy budget), warning `#D97706/#F59E0B`
   (approaching limit, degraded latency), danger `#DC2626/#EF4444` (error, budget reached, fail), info
   `#0EA5E9/#38BDF8` (consent). Each ships a `-subtle` ~12% alpha fill. → `<BudgetMeter>`, `<EvalResults>`.
-- **Latency × Cost encoding scale (FROZEN, reused everywhere).** Latency p50 buckets: good `<500ms` (success),
-  ok `500–900ms` (lime/amber), slow `900–1500ms` (warning), bad `>1500ms` (danger). Cost encoded via
+- **Latency × Cost encoding scale (FROZEN, reused everywhere).** Uses the frozen `--latency-*` tokens (stable
+  app-wide, independent of the amber brand accent). Latency p50 buckets: good `<500ms` (`#16A34A`), ok
+  `500–900ms` (`#65A30D`), slow `900–1500ms` (`#D97706`), bad `>1500ms` (`#DC2626`). Cost encoded via
   opacity/bubble fill on the same hue family — "fast+cheap" reads green-bright, "slow+expensive" red-muted.
   Identical thresholds in `<LatencyCostChart>`, `<TraceWaterfall>`, `<LeaderboardTable>`, `<CostBreakdown>` so a
   color means the same thing app-wide.
 
 ### Typography / spacing / radius / elevation
-- **Type:** Geist Sans (UI), Geist/JetBrains Mono (all numbers, latencies, costs, IDs, transcripts,
-  `tabular-nums`). Display 32/40 → caption 12/16. Headings tracking −0.01em.
+- **Type:** **Space Grotesk** (`--font-heading`, display/headings), **Hanken Grotesk** (`--font-sans`, UI/body),
+  **IBM Plex Mono** (`--font-mono`, all numbers, latencies, costs, IDs, transcripts, `tabular-nums`).
+  Display 32/40 → caption 12/16.
 - **Spacing:** 4px base, 8-step scale (4/8/12/16/24/32/48/64). Section gap 24–32, card padding 16–24.
-- **Radius:** sm 6 (chips), md 8 (inputs/buttons), lg 12 (cards/popovers), xl 16 (modals/AgentStage), full
-  (orb/avatars/dots).
+- **Radius:** sm 6 (chips), md 8 (inputs/buttons), lg 12 (cards/popovers), xl 16 (modals/visualizer), full
+  (avatars/dots).
 - **Elevation:** 0 page → 1 hairline border (cards) → 2 sm shadow (popover) → 3 md (modal/sheet) → 4 lg (toast).
   Dark mode uses lighter surface tints instead of heavy shadows. Hover raises interactive cards 1→2 over 150ms.
 
@@ -115,7 +119,7 @@ sticky-with-Retry for errors. Variants success/info/warning/error/loading + prom
 ### Accessibility & responsive foundation
 2px focus-visible ring with offset; skip-to-content; dialogs trap+restore focus; WCAG-AA contrast (4.5:1 / 3:1);
 color never the sole signal (icon/label/shape). Breakpoints sm 640 / md 768 / lg 1024 / xl 1280 / 2xl 1536.
-`prefers-reduced-motion` disables orb/waveform, pulses, shimmer, slides → instant/opacity.
+`prefers-reduced-motion` disables the visualizer/waveform, pulses, shimmer, slides → instant/opacity.
 
 ---
 
@@ -125,47 +129,45 @@ color never the sole signal (icon/label/shape). Breakpoints sm 640 / md 768 / lg
 
 **Purpose.** The front door. In ~5s convey: a doc-grounded AI voice receptionist you can talk to right now
 in-browser, no signup, built to a production bar. Single-screen, scannable marketing page whose only conversion
-goal is routing into Try It. Secondary thesis: credibility, proven live via a realtime anonymized Recent Calls
-element.
+goal is routing into Try It. Secondary thesis: credibility, shown through a production-grade hero
+`VoiceVisualizer` demo with the engineering surfaced one click away.
 
-**Layout overview.** Single vertical-scroll page, max ~1200px, calm-but-technical, mono accents. Sticky
-transparent-over-hero nav that gains blur on scroll. Sections top→bottom: Hero → How it works (3 steps) → "What
-makes this serious" (5 engineering teasers) → Recent calls (live proof) → Privacy trust band → Footer. Recharts
-NOT used here — small static SVG mini-glyphs tease the internal viz.
+**Layout overview.** Single vertical-scroll page, max ~1200px, warm paper + ink with one amber accent, mono
+labels. Sticky transparent-over-hero nav that gains blur on scroll. Sections top→bottom (Signal Bold rebuild):
+asymmetric split Hero → trust band → "Set it up in three steps" → editorial 2-col capability list (not a card
+grid) → closing CTA → privacy band. Recharts NOT used here — the hero renders a real `VoiceVisualizer` demo.
 
 **Sections & key components.**
 - **NavBar / ThemeToggle** — sticky, wordmark "Receptionist · voice AI", links + accent CTA "Talk to a
   receptionist," hamburger sheet on mobile (CTA stays in bar).
 - **Hero** — `HeroHeadlineBlock` (mono eyebrow "DOCUMENT-GROUNDED · WEB-ONLY · NO SIGNUP", headline "Talk to an
   AI receptionist that actually knows the business."), `HeroCTAGroup` (primary → `/try`, secondary smooth-scroll;
-  micro-reassurance "No signup · 120-second demo call · Mic asked once") → **CallController**, `LiveSignalChip`
-  (pulsing dot + reactive "2 calls live now · 41 today"), `HeroVisual` (Variant A faint 3-col product peek /
-  Variant B orb on gradient with mono chips) → **AgentStage**.
+  micro-reassurance "No signup · 120-second demo call · Mic asked once") → **CallController**; `HeroVisual` is a
+  dark `CallCard` rendering `VoiceVisualizer mode="demo"` as a real component preview (asymmetric split hero — no
+  orb-on-gradient mockup, no live-signal chip) → **VoiceVisualizer**.
 - **How it works** — 3× `StepCard` (Pick/upload a doc → Talk in browser → Get a booking + report) →
   **DocUploader**; `StepConnector` (desktop dashed arrows).
 - **What makes this serious** — 5× `FeatureCard` (Live tracing → **TraceWaterfall**, Provider leaderboard, Eval
   harness, $40 budget guard, Guardrails) each with a static SVG mini-glyph + hover "View →" route;
   `BudgetGuardTeaser` slim live bar → **BudgetMeter**.
-- **Recent calls** — `RecentCallTicker` (marquee desktop / list mobile, anonymized pills) → **CallTimeline**.
+- **Recent calls** — retired from the landing (the marquee ticker was removed in the Signal Bold rebuild). The
+  realtime anonymized feed now lives on its own page, `/calls` (§3.6).
 - **Privacy trust line** — `TrustBand` (4 icon+label items).
 - **Footer** — `FooterBlock` (brand, condensed nav, "Built with Next.js · Convex · VAPI", optional CTA repeat).
 
-**Interactions.** Nav blur on scroll; live widgets update reactively; ticker auto-scrolls and pauses on hover;
-cards lift on hover; all motion gated behind reduced-motion (fade not slide). Hero orb breathes; entrance stagger
-~150ms.
+**Interactions.** Nav blur on scroll; cards lift on hover; all motion gated behind reduced-motion (fade not
+slide). The hero `VoiceVisualizer` runs its synthetic demo; entrance stagger ~150ms.
 
 **Primary actions.** Talk to a receptionist (→ `/try`) · See how it works (scroll) · explore a feature card · See
 all recent calls (→ `/calls`) · toggle theme.
 
-**States.** *Loading:* live widgets show skeletons (connecting dot, shimmer budget track, placeholder pills);
-static marketing renders immediately. *Empty:* ticker → friendly empty + inline Talk button; chip → "Idle — be
-the first today"; budget "$0.00 / $40." *Error:* live widgets fail silent-graceful (chip → "Live demo," ticker →
-"See all recent calls →," budget hides bar) + optional sonner; CTA never gated. *Special:* budget reached → CTA
-disabled "Demo budget reached for today — back tomorrow," meter at-cap; demo busy → hint "you may be placed in a
-short queue."
+**States.** *Loading:* static marketing + the hero `VoiceVisualizer` demo render immediately; there are no live
+data widgets to skeleton. *Empty / Error:* not applicable to the hero — the demo is synthetic, not live data, and
+the CTA is never gated. *Special:* if the global budget is reached the landing still renders fully (every
+benchmark, trace, and eval stays explorable); the guard state surfaces on the next screen, `/try`.
 
-**Data:** `budget.getPublicState`, `calls.activeCount`, `calls.countToday`, `calls.listRecentAnonymized`. VAPI
-SDK NOT initialized here.
+**Data:** none required — the landing is static marketing plus a synthetic hero `VoiceVisualizer` demo. No live
+queries, no VAPI SDK on this route.
 
 ---
 
@@ -180,8 +182,8 @@ state.
 **Layout overview.** Top nav + thin global status strip; full-bleed 3-col grid ~28%/44%/28%. **LEFT = Setup**
 (DocUploader → ingestion → Business Profile → PipelineSelector). **CENTER = Live Stage** (AgentStage →
 CallController → CallTimeline). **RIGHT = Live Trace** (TraceWaterfall → ToolCallInspector → BudgetMeter →
-guardrails → CostBreakdown). Above fold: 3 headers, orb, Talk button, first waterfall turn, BudgetMeter. Rails
-scroll independently; consent/guard states render in-context, never as a separate route.
+guardrails → CostBreakdown). Above fold: 3 headers, the live visualizer, Talk button, first waterfall turn,
+BudgetMeter. Rails scroll independently; consent/guard states render in-context, never as a separate route.
 
 **Sections & key components.**
 - **TopNav + `GlobalStatusStrip`** — "2 of 3 lines live · est. $12.40/$40 today · you have 2 calls left today";
@@ -190,8 +192,9 @@ scroll independently; consent/guard states render in-context, never as a separat
   `IngestionProgress` (Uploading→Parsing→Extracting→Indexing→Ready); `BusinessProfilePreview` (companyName, hours,
   services chips, policies, "12 chunks indexed"); `PipelineSelector` (independent STT/TTS+voice/LLM, Fal.ai
   "Custom adapter" badge, sample-clip play, "swapping restarts the call") → **PipelineSelector**.
-- **CENTER Live Stage** — `AgentStage` (amplitude-reactive orb, lang badge, idle/speaking/listening/connecting)
-  → **AgentStage**; `CallController` (Talk/End, mute, status pill, 120s countdown ring, "View call report →") →
+- **CENTER Live Stage** — `AgentStage` (hosts the amplitude-reactive `VoiceVisualizer mode="live"`, driven by
+  real VAPI volume + agentSpeaking; lang badge; idle/speaking/listening/connecting/ended)
+  → **VoiceVisualizer**; `CallController` (Talk/End, mute, status pill, 120s countdown ring, "View call report →") →
   **CallController**; `CallTimeline` (streaming speaker turns + system events, interim greyed → solidifies,
   auto-scroll + jump-to-live) → **CallTimeline**; `ConsentGate` (first-call modal); `MicPermissionPrompt`.
 - **RIGHT Live Trace** — `TraceWaterfall` (per-turn STT→LLM→tool→TTS spans + time-to-first-word) →
@@ -213,7 +216,7 @@ end. Observability rendered off the audio critical path.
 selected; rails captioned "Trace appears once the call starts." *Empty:* center/right dimmed with guiding caption;
 purposeful empty placeholders, not blank boxes. *Error:* ingest-fail step turns red + retry; mic denied panel +
 re-enable how-to; connection drop → "reconnecting…" banner → resume or graceful end into partial report.
-*Special:* consent gate, mic prompt, 3 guard panels, 120s cap, PII redaction shown, reduced-motion orb fallback.
+*Special:* consent gate, mic prompt, 3 guard panels, 120s cap, PII redaction shown, reduced-motion visualizer fallback.
 
 **Data:** `calls.activeConcurrency`, `budget.getState`, `visitorUsage.getForVisitor`, `canStartCall`,
 `businesses.listPresets`, `documents.ingest`/`businesses.getIngestionStatus`, `businesses.getProfile`,
@@ -533,9 +536,10 @@ actions) and the VAPI Web SDK (voice); there is no auth, no payments, no signup.
 
 **Order: foundation first, then read-surfaces, then the live loop, then admin.**
 
-**0. Foundation / Design System** — "Generate a production-grade design-system foundation for a
-'calm-but-technical' voice-AI receptionist demo: slate neutrals with a single indigo/violet accent, full
-light+dark parity, Geist Sans UI with mono for all numbers/latencies/costs. Show the 56px blurred top nav
+**0. Foundation / Design System** — "Generate a production-grade design-system foundation for a 'Signal Bold'
+voice-AI receptionist demo: warm paper + ink neutrals with a single restrained amber accent, full light+dark
+parity, Space Grotesk headings + Hanken Grotesk body + IBM Plex Mono for all numbers/latencies/costs, Phosphor
+icons. Show the 56px blurred top nav
 (wordmark + Try It/Leaderboard/Evals/Analytics/Recent Calls + live budget mini-pill + light/dark toggle), a slim
 compliance footer, provider brand chips, and the frozen status badges (idle/connecting/live/ended,
 booked/intent/abandoned, pass/fail) plus the shared latency×cost color scale. Render the reusable LOADING
@@ -547,25 +551,26 @@ AA contrast and reduced-motion support."
 voice receptionist demo aimed at engineers and employers. Sticky minimal top nav (wordmark, links Try
 It/Leaderboard/Evals/Analytics/Recent Calls, theme toggle, accent CTA 'Talk to a receptionist'); a confident hero
 with a mono eyebrow, two-line headline 'Talk to an AI receptionist that actually knows the business,' subtext, two
-CTAs, a tiny pulsing live-calls chip, and a softly-framed product peek of a 3-column mission-control with a glowing
-agent orb. Below: a 3-step 'how it works' row, a 5-card 'built like production' engineering strip (live tracing,
-provider leaderboard, eval harness, $40 budget guard, guardrails) each with a tiny static viz glyph, a realtime
-anonymized 'recent calls' ticker of pipeline pills, a slim privacy trust band, and a multi-column footer.
-Near-monochrome neutral palette with one restrained accent, generous whitespace, mono technical labels —
-instrumented and serious, never salesy; no pricing."
+CTAs, and a real component preview — a dark mission-control card running a live amplitude-reactive voice
+visualizer (few-bar equalizer). Below: a 'set it up in three steps' row, an editorial two-column capability list
+(live tracing, provider leaderboard, eval harness, $40 budget guard, guardrails), a slim privacy trust band, and
+a closing CTA. Warm-paper + ink near-monochrome palette with ONE restrained amber accent (Signal Bold), Phosphor
+icons, generous whitespace, mono technical labels — instrumented and serious, never salesy; no pricing."
 
 **2. Try It — Mission Control (`/try`)** — "Design a polished, production-grade 3-column 'mission control' for a
 live AI voice receptionist demo, light+dark parity, responsive. LEFT rail: a drag-drop document uploader with
 three preset business cards (dental clinic, salon, law office), a stepped ingestion progress indicator, an
 extracted Business Profile card (company name, hours, services chips), and a Voice Pipeline selector with
 independent STT/TTS-voice/LLM dropdowns showing per-provider cost-per-minute and a 'changing restarts the call'
-notice. CENTER: a large amplitude-reactive glowing orb/waveform agent stage with a detected-language badge, a big
-Talk/End call button with mute and a 120-second countdown ring and status pill (idle/connecting/live/ended), and a
+notice. CENTER: a large amplitude-reactive voice visualizer (few-bar equalizer) as the agent stage with a
+detected-language badge, a big Talk/End call button with mute and a 120-second countdown ring and status pill
+(idle/connecting/live/ended), and a
 streaming speaker-turn transcript below. RIGHT rail: a per-turn latency waterfall (STT→LLM→tool→TTS with
 time-to-first-word), a live tool-call inspector (lookup_knowledge/check_availability/book_appointment), a budget
 meter 'est. $12.40/$40' with a daily $8 sub-cap, guardrail status chips, and a per-component cost ticker.
-Sophisticated dark control-room aesthetic with monospace numerals, subtle accent glows, a consent/recording
-disclosure modal, and graceful 'demo busy / daily limit reached / budget reached' panels."
+Sophisticated dark control-room aesthetic with monospace numerals, one restrained amber accent (no glow as a
+primary affordance), a consent/recording disclosure modal, and graceful 'demo busy / daily limit reached / budget
+reached' panels."
 
 **3. Post-Call Report (`/call/[id]`)** — "Design a polished, production-grade two-column post-call analytics
 dashboard for an AI voice receptionist, light and dark parity. Top: a full-width header strip with business name,
@@ -599,7 +604,7 @@ meter), each with a delta chip and sparkline. Middle: two side-by-side recharts 
 (area/stacked-bar) and latency trend (p50/p95 multi-line) — then a full-width daily-spend chart with dashed $8/day
 and solid red $40 reference lines. Bottom: a 2x2 grid of breakdown cards (calls by business and by provider
 pairing as horizontal ranked bars, outcomes booked/intent/abandoned, and sentiment distribution as donuts). Use
-shadcn cards with subtle borders, lucide icons, a restrained accent palette consistent across all charts, generous
+shadcn cards with subtle borders, Phosphor icons, a restrained accent palette consistent across all charts, generous
 whitespace, and include skeleton-loading and empty ('No calls in this window yet') variants."
 
 **6. Recent Calls (`/calls`)** — "Design a polished, production-grade 'Recent Calls' wall for an AI
@@ -609,11 +614,11 @@ filter bar (Outcome chips: Booked/Intent/Abandoned, plus Business and Provider s
 Below, render a responsive 3-column grid of compact call cards — each with a business name, a color-coded outcome
 badge, three small provider chips (STT/TTS/LLM), a metadata row (duration, total cost, language, time-ago), and a
 tiny trace sparkline footer — with new cards subtly highlighted as they animate in. Keep it elegant and scannable
-using shadcn/ui, Tailwind, lucide icons, and recharts sparklines, and include skeleton-card loading and a 'be the
+using shadcn/ui, Tailwind, Phosphor icons, and recharts sparklines, and include skeleton-card loading and a 'be the
 first to try it' empty state."
 
 **7. Evals (`/evals`)** — "Generate a polished, production-grade dark-and-light eval dashboard for a voice-AI
-product, Linear/Vercel aesthetic with shadcn/ui + Tailwind, lucide icons, recharts. Layout: persistent top nav
+product, Linear/Vercel aesthetic with shadcn/ui + Tailwind, Phosphor icons, recharts. Layout: persistent top nav
 with 'Evals' active; a header row with three pipeline dropdowns (STT/TTS/LLM) plus a business dropdown and a
 primary 'Run evals' button; a sticky left run-history rail of run cards (config chips, timestamp, pass ratio,
 colored status dot); and a right results workspace showing a bold red/green Regression Summary banner ('2
@@ -649,7 +654,7 @@ contracts:
 | Workstream | Screens | Nature | Key contracts |
 |---|---|---|---|
 | **Frontend read-surfaces** (reactive Convex queries only; no VAPI SDK) | Landing `/`, Leaderboard `/leaderboard`, Analytics `/analytics`, Recent Calls `/calls`, Post-Call Report `/call/[id]` | Marketing + analytics/observability dashboards rendered from persisted call telemetry; read-only, shareable, deep-linkable | `LeaderboardTable`, `LatencyCostChart`, `TraceWaterfall`, `CostBreakdown`, `CallTimeline`, `SessionReplay`, `BudgetMeter`, `EvalResults` |
-| **Live call loop** (VAPI Web SDK + Convex; the realtime path) | Try It — Mission Control `/try`, plus the **Evals** `/evals` run engine (simulated-caller runs) | Mounts the SDK, drives the orb/transcript/trace off SDK events on the audio critical path's edge, owns consent/mic/guard gating and the $40 guard at call-start | `CallController`, `AgentStage`, `DocUploader`, `PipelineSelector`, `TraceWaterfall`, `CostBreakdown`, `BudgetMeter`, `CallTimeline`, `EvalResults` |
+| **Live call loop** (VAPI Web SDK + Convex; the realtime path) | Try It — Mission Control `/try`, plus the **Evals** `/evals` run engine (simulated-caller runs) | Mounts the SDK, drives the visualizer/transcript/trace off SDK events on the audio critical path's edge, owns consent/mic/guard gating and the $40 guard at call-start | `CallController`, `AgentStage`, `DocUploader`, `PipelineSelector`, `TraceWaterfall`, `CostBreakdown`, `BudgetMeter`, `CallTimeline`, `EvalResults` |
 | **Admin / operations** (private, env-gated; authoritative state + interventions) | Admin Control Room `/admin` | NOC console reading authoritative `budgetState`/guard/purge state; houses force-guard and manual purge; never in public nav | `BudgetMeter`, `CostBreakdown`, `CallTimeline`, `EvalResults` |
 | **Foundation** (cross-cutting; consumed by all three) | Design System `_foundation` | Tokens, app chrome (nav/footer), provider chips, status badges, latency×cost color scale, toast system, and the LOADING/EMPTY/ERROR + guard/limit templates every surface implements | App shell + all frozen contracts |
 

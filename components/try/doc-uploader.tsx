@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Upload, CheckCircle2, Loader2 } from "lucide-react";
+import { UploadSimple, CheckCircle, CircleNotch } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 
 export type UploadState =
@@ -18,7 +18,7 @@ interface DocUploaderProps {
 }
 
 const ACCEPTED =
-  ".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain";
+  ".pdf,.docx,.txt,.png,.jpg,.jpeg,.webp,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,image/png,image/jpeg,image/webp";
 const MAX_MB = 5;
 
 export function DocUploader({ onIngest, state, disabled }: DocUploaderProps) {
@@ -70,22 +70,22 @@ export function DocUploader({ onIngest, state, disabled }: DocUploaderProps) {
       >
         {state.status === "ready" ? (
           <>
-            <CheckCircle2 className="size-6 text-primary" />
+            <CheckCircle className="size-6 text-primary" />
             <span className="text-sm font-medium text-foreground">{state.fileName}</span>
             <span className="text-xs text-muted-foreground">Ready — click to replace</span>
           </>
         ) : isLoading ? (
           <>
-            <Loader2 className="size-6 animate-spin text-muted-foreground" />
+            <CircleNotch className="size-6 animate-spin text-muted-foreground" />
             <span className="text-sm text-muted-foreground">
               {state.status === "uploading" ? "Uploading…" : "Analyzing with AI…"}
             </span>
           </>
         ) : (
           <>
-            <Upload className="size-6 text-muted-foreground" />
+            <UploadSimple className="size-6 text-muted-foreground" />
             <span className="text-sm font-medium">Drop a doc or click to browse</span>
-            <span className="text-xs text-muted-foreground">PDF · DOCX · TXT · max 5 MB</span>
+            <span className="text-xs text-muted-foreground">PDF · DOCX · TXT · PNG · JPG · max 5 MB</span>
           </>
         )}
       </button>

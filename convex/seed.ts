@@ -131,15 +131,17 @@ export const seed = internalMutation({
     }
 
     // ── 2. providerStats (mirror MOCK_PROVIDER_STATS) ─────────────────────────────
+    // Small DEMO numbers: callCount mirrors the 3 demo calls below; avgRating is a
+    // modest illustrative value. Shown behind a "Demo data" label, not measured usage.
     const providerStats = [
-      { provider: "Deepgram Flux", kind: "stt", source: "native", p50LatencyMs: 240, p95LatencyMs: 410, costPerMin: 0.006, avgRating: 4.6, callCount: 318, languages: ["en", "es"] },
-      { provider: "AssemblyAI", kind: "stt", source: "native", p50LatencyMs: 380, p95LatencyMs: 620, costPerMin: 0.007, avgRating: 4.3, callCount: 142, languages: ["en"] },
-      { provider: "Fal.ai Whisper", kind: "stt", source: "custom", p50LatencyMs: 520, p95LatencyMs: 880, costPerMin: 0.004, avgRating: 4.1, callCount: 64, languages: ["en", "es", "fr"] },
-      { provider: "Cartesia Sonic-3", kind: "tts", source: "native", voice: "Sonic", p50LatencyMs: 290, p95LatencyMs: 520, costPerMin: 0.02, avgRating: 4.7, callCount: 271, languages: ["en", "es"] },
-      { provider: "ElevenLabs", kind: "tts", source: "native", voice: "Rachel", p50LatencyMs: 640, p95LatencyMs: 980, costPerMin: 0.05, avgRating: 4.8, callCount: 188, languages: ["en"] },
-      { provider: "Fal.ai Kokoro-82M", kind: "tts", source: "custom", voice: "Kokoro", p50LatencyMs: 720, p95LatencyMs: 1180, costPerMin: 0.003, avgRating: 4.0, callCount: 52, languages: ["en"] },
-      { provider: "GPT-4o mini", kind: "llm", source: "native", p50LatencyMs: 450, p95LatencyMs: 760, costPerMin: 0.015, avgRating: 4.5, callCount: 402, languages: ["en", "es", "fr"] },
-      { provider: "Groq Llama-3.3", kind: "llm", source: "native", p50LatencyMs: 210, p95LatencyMs: 390, costPerMin: 0.008, avgRating: 4.2, callCount: 156, languages: ["en"] },
+      { provider: "Deepgram Flux", kind: "stt", source: "native", p50LatencyMs: 240, p95LatencyMs: 410, costPerMin: 0.006, avgRating: 4.6, callCount: 1, languages: ["en", "es"] },
+      { provider: "AssemblyAI", kind: "stt", source: "native", p50LatencyMs: 380, p95LatencyMs: 620, costPerMin: 0.007, avgRating: 4.3, callCount: 1, languages: ["en"] },
+      { provider: "Fal.ai Whisper", kind: "stt", source: "custom", p50LatencyMs: 520, p95LatencyMs: 880, costPerMin: 0.004, avgRating: 4.1, callCount: 1, languages: ["en", "es", "fr"] },
+      { provider: "Cartesia Sonic-3", kind: "tts", source: "native", voice: "Sonic", p50LatencyMs: 290, p95LatencyMs: 520, costPerMin: 0.02, avgRating: 4.7, callCount: 1, languages: ["en", "es"] },
+      { provider: "ElevenLabs", kind: "tts", source: "native", voice: "Rachel", p50LatencyMs: 640, p95LatencyMs: 980, costPerMin: 0.05, avgRating: 4.8, callCount: 1, languages: ["en"] },
+      { provider: "Fal.ai Kokoro-82M", kind: "tts", source: "custom", voice: "Kokoro", p50LatencyMs: 720, p95LatencyMs: 1180, costPerMin: 0.003, avgRating: 4.0, callCount: 1, languages: ["en"] },
+      { provider: "GPT-4o mini", kind: "llm", source: "native", p50LatencyMs: 450, p95LatencyMs: 760, costPerMin: 0.015, avgRating: 4.5, callCount: 2, languages: ["en", "es", "fr"] },
+      { provider: "Groq Llama-3.3", kind: "llm", source: "native", p50LatencyMs: 210, p95LatencyMs: 390, costPerMin: 0.008, avgRating: 4.2, callCount: 1, languages: ["en"] },
     ] as const;
 
     for (const s of providerStats) {
@@ -157,10 +159,11 @@ export const seed = internalMutation({
       });
     }
 
-    // ── 3. Recent calls (mirror MOCK_RECENT_CALLS, 12 rows) ────────────────────────
+    // ── 3. Recent calls (mirror MOCK_RECENT_CALLS, 3 demo rows) ────────────────────
     // Same deterministic formulas as lib/data/mock.ts, with startedAt resolved
-    // against BASE_EPOCH instead of render-time `now`.
-    const BUSINESSES = ["Glow Dental", "Lux Salon", "Hale & Park Law", "Bright Smiles", "Urban Cuts"];
+    // against BASE_EPOCH instead of render-time `now`. Preset businesses only —
+    // one demo call per preset, one per outcome.
+    const BUSINESSES = ["Glow Dental", "Lux Salon", "Hale & Park Law"];
     const OUTCOMES = ["booked", "intent", "abandoned"] as const;
     const STTS = ["Deepgram Flux", "AssemblyAI", "Fal.ai Whisper"];
     const TTSS = ["Cartesia Sonic-3", "ElevenLabs", "Fal.ai Kokoro-82M"];
@@ -171,12 +174,7 @@ export const seed = internalMutation({
     };
     const TTFW = [320, 540, 880, 1240];
 
-    // Calls reference a real businessId when the name is a known preset; the two
-    // non-preset demo names (Bright Smiles, Urban Cuts) fall back to Glow Dental
-    // so the FK is always valid (judgment call — see summary).
-    const fallbackBusinessId = businessIds["Glow Dental"];
-
-    for (let i = 0; i < 12; i++) {
+    for (let i = 0; i < 3; i++) {
       const outcome = OUTCOMES[i % 3];
       const businessName = BUSINESSES[i % BUSINESSES.length];
       const stt = STTS[i % 3];
@@ -184,7 +182,7 @@ export const seed = internalMutation({
       const ttfw = TTFW[i % 4];
       const startedAt = BASE_EPOCH - (i * 7 + 2) * 60_000; // "N minutes ago"
       const durationSec = 45 + ((i * 17) % 70);
-      const businessId = businessIds[businessName] ?? fallbackBusinessId;
+      const businessId = businessIds[businessName];
 
       await ctx.db.insert("calls", {
         sessionId: `seed_session_${(i + 1).toString().padStart(4, "0")}`,
@@ -209,10 +207,10 @@ export const seed = internalMutation({
       });
     }
 
-    // ── 4. budgetState singleton (mirror MOCK_BUDGET spend + active calls) ─────────
+    // ── 4. budgetState singleton (clean slate — no fabricated spend) ──────────────
     await ctx.db.insert("budgetState", {
-      totalSpentUsd: 12.4,
-      daySpentUsd: 2.4,
+      totalSpentUsd: 0,
+      daySpentUsd: 0,
       day: "2026-06-16",
       activeCalls: 0,
     });

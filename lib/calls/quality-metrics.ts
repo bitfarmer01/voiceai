@@ -8,15 +8,22 @@
  *
  * Definitions:
  *   - talkRatio   — assistant share of total speaking time (0..1).
- *   - interruptions — user speaking windows (stt) that begin inside an
- *                     assistant speaking window (tts) — i.e. barge-ins.
+ *   - interruptions — user barge-ins: a user transcript arriving while the
+ *                     assistant is mid-utterance. Computed from RAW event
+ *                     arrival timestamps (see below), NOT from the derived
+ *                     stt/tts spans — those are built non-overlapping and a
+ *                     barge-in opens a fresh turn, so a span-based check is
+ *                     structurally always 0.
  *   - deadAirSec  — wall-clock seconds inside the conversation with no one
- *                   speaking (window minus the union of stt+tts intervals).
+ *                   speaking (window minus the union of stt+llm+tts intervals;
+ *                   llm is included so model latency isn't miscounted as
+ *                   silence).
  *   - wpm         — assistant words per minute over total TTS time.
  *
  * PURE: no Date.now()/Math.random(), no IO.
  */
 import type { SpanKind, TurnRole } from "@/lib/types";
+import type { VapiEvent } from "@/lib/vapi/derive-spans";
 
 export interface MetricTurn {
   role: TurnRole;
@@ -67,13 +74,57 @@ function unionMs(intervals: Array<[number, number]>): number {
   return total;
 }
 
+/**
+ * Count barge-ins from RAW VAPI events by arrival timestamp.
+ *
+ * A barge-in is a user transcript event that lands WHILE the assistant is still
+ * speaking — i.e. there is an assistant transcript event both before AND after
+ * it (the assistant was mid-utterance: it had already started, and it kept
+ * speaking past the user's interjection). The derived stt/tts spans can't reveal
+ * this: they're built non-overlapping and a barge-in opens a fresh turn, so we
+ * have to read it off the pre-turn-split raw stream.
+ *
+ * Consecutive user events with no assistant event between them count as a single
+ * interruption (one continuous interjection), so multiple user partials inside
+ * one assistant utterance aren't over-counted.
+ *
+ * NOTE(vapi-shape): this is ARRIVAL-timestamp-based and therefore approximate —
+ * it depends on VAPI's transcript event ordering/latency, the same caveat as the
+ * existing TODO(vapi-shape) in the span derivation. A live /try smoke test is
+ * needed to confirm the SDK actually interleaves user events into an ongoing
+ * assistant utterance (vs. buffering them until the assistant stops).
+ */
+function interruptionsFromEvents(events: VapiEvent[]): number {
+  const tx = events.filter((e) => e.type === "transcript");
+  if (tx.length === 0) return 0;
+
+  let interruptions = 0;
+  let sawAssistantBefore = false;
+  let inUserRun = false; // are we inside a contiguous run of user events?
+  for (let i = 0; i < tx.length; i++) {
+    const ev = tx[i];
+    if (ev.role === "assistant") {
+      // An assistant event after a user run means the assistant resumed
+      // speaking past the user's interjection → that run was a barge-in.
+      if (inUserRun && sawAssistantBefore) interruptions++;
+      inUserRun = false;
+      sawAssistantBefore = true;
+    } else if (ev.role === "user") {
+      inUserRun = true;
+    }
+  }
+  return interruptions;
+}
+
 export function computeQualityMetrics(
   turns: MetricTurn[],
   spans: MetricSpan[],
+  events: VapiEvent[] = [],
 ): QualityMetrics {
   if (turns.length === 0 && spans.length === 0) return ZERO;
 
   const stt = spans.filter((s) => s.kind === "stt");
+  const llm = spans.filter((s) => s.kind === "llm");
   const tts = spans.filter((s) => s.kind === "tts");
 
   const sumDur = (xs: MetricSpan[]) =>
@@ -85,16 +136,15 @@ export function computeQualityMetrics(
   const totalTalk = userTalk + asstTalk;
   const talkRatio = totalTalk > 0 ? asstTalk / totalTalk : 0;
 
-  // interruptions — a user window beginning inside an assistant window.
-  let interruptions = 0;
-  for (const u of stt) {
-    if (tts.some((a) => u.startMs > a.startMs && u.startMs < a.endMs)) {
-      interruptions++;
-    }
-  }
+  // interruptions — barge-ins, computed from raw event arrival timestamps
+  // (see interruptionsFromEvents). The derived stt/tts spans are non-overlapping
+  // by construction, so a span-based check is structurally always 0.
+  const interruptions = interruptionsFromEvents(events);
 
   // deadAir — conversation window minus the union of all speaking intervals.
-  const speaking: Array<[number, number]> = [...stt, ...tts].map((s) => [
+  // Include llm spans so user-final→assistant-first-token model latency isn't
+  // miscounted as silence.
+  const speaking: Array<[number, number]> = [...stt, ...llm, ...tts].map((s) => [
     s.startMs,
     s.endMs,
   ]);

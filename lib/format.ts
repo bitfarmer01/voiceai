@@ -1,7 +1,7 @@
 /**
  * Formatting + the FROZEN latency × cost encoding scale (ui-development-plan.md §2).
- * A latency colour means the same thing everywhere: LatencyCostChart, TraceWaterfall,
- * LeaderboardTable, CostBreakdown all import these helpers so the encoding never drifts.
+ * A latency colour means the same thing everywhere: the Leaderboard rankings, TraceWaterfall,
+ * and CostBreakdown all import these helpers so the encoding never drifts.
  */
 
 export type LatencyBucket = "good" | "ok" | "slow" | "bad";

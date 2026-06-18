@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Inbox } from "lucide-react";
+import { Tray } from "@phosphor-icons/react/dist/ssr";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
  * the unblocking action. Used by every list/detail view (never a blank box).
  */
 export function EmptyState({
-  icon: Icon = Inbox,
+  icon: Icon = Tray,
   title,
   description,
   action,

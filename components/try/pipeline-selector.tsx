@@ -1,6 +1,6 @@
 "use client";
 
-import { Sparkles } from "lucide-react";
+import { Sparkle } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 import { formatUsd } from "@/lib/format";
 import {
@@ -39,7 +39,7 @@ function Row({
           {providers.map((p) => (
             <SelectItem key={p.id} value={p.id}>
               <span className="flex items-center gap-2">
-                {p.source === "custom" && <Sparkles className="size-3 text-primary" />}
+                {p.source === "custom" && <Sparkle className="size-3 text-primary" />}
                 {p.name}
                 <span className="font-mono text-[10px] text-muted-foreground">{formatUsd(p.costPerMin, 3)}/min</span>
               </span>

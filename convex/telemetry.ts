@@ -26,6 +26,15 @@ export const batchWriteSpans = mutation({
     const call = await ctx.db.get(args.callId);
     if (!call || call.sessionId !== args.sessionId) return null;
 
+    // One query up front instead of N+1 .unique() lookups — the client
+    // re-flushes the full span list every ~5s, so the per-span index hit was
+    // O(spans) per flush. Build a map by spanId for O(1) lookup in the loop.
+    const existingSpans = await ctx.db
+      .query("spans")
+      .withIndex("by_trace_span", (q) => q.eq("traceId", args.callId))
+      .collect();
+    const bySpanId = new Map(existingSpans.map((s) => [s.spanId, s._id]));
+
     for (const span of args.spans) {
       // Reject any span not keyed to this call — no cross-trace contamination.
       if (span.traceId !== args.callId) continue;
@@ -43,14 +52,9 @@ export const batchWriteSpans = mutation({
       // Upsert by (traceId, spanId): the client re-flushes already-seen spans on
       // each tick; without this, every flush would duplicate them, and a span
       // whose window grew (assistant kept speaking) would never update.
-      const prev = await ctx.db
-        .query("spans")
-        .withIndex("by_trace_span", (q) =>
-          q.eq("traceId", args.callId).eq("spanId", span.spanId),
-        )
-        .unique();
-      if (prev) {
-        await ctx.db.patch(prev._id, fields);
+      const prevId = bySpanId.get(span.spanId);
+      if (prevId) {
+        await ctx.db.patch(prevId, fields);
       } else {
         await ctx.db.insert("spans", fields);
       }

@@ -3,11 +3,12 @@
 import * as React from "react";
 import Link from "next/link";
 import { useQuery } from "convex/react";
-import { Clock, Phone } from "lucide-react";
+import { Clock, Phone } from "@phosphor-icons/react";
 import { api } from "@/convex/_generated/api";
 import { cn } from "@/lib/utils";
 import { formatUsd, formatDuration } from "@/lib/format";
 import { EmptyState } from "@/components/states/empty-state";
+import { DemoDataBadge } from "@/components/shared/demo-data-badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import type { CallOutcome } from "@/lib/types";
@@ -40,7 +41,10 @@ export default function CallsPage() {
     <div className="mx-auto w-full max-w-5xl px-4 py-10 sm:px-6">
       <div className="mb-8 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Recent Calls</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold">Recent Calls</h1>
+            <DemoDataBadge />
+          </div>
           <p className="mt-1 text-sm text-muted-foreground">
             Live anonymized feed — no PII stored
           </p>

@@ -45,7 +45,6 @@ function startOfLocalDay(ms: number): number {
  */
 async function guardCheck(
   ctx: MutationCtx,
-  visitorKey: string,
   now: number,
 ): Promise<GuardReason> {
   const today = dayBucket(now);
@@ -55,17 +54,10 @@ async function guardCheck(
   const daySpent = budget && budget.day === today ? budget.daySpentUsd : 0;
   const activeCalls = budget?.activeCalls ?? 0;
 
-  const usage = await ctx.db
-    .query("visitorUsage")
-    .withIndex("by_visitor_day", (q) =>
-      q.eq("visitorKey", visitorKey).eq("day", today),
-    )
-    .unique();
-  const callsToday = usage?.callsToday ?? 0;
-
+  // The per-visitor daily call cap is removed for now — a running call is
+  // bounded instead by the per-call duration cutoff (BUDGET.MAX_CALL_SECONDS).
   if (totalSpent >= BUDGET.TOTAL_CAP) return "total_budget";
   if (daySpent >= BUDGET.DAY_CAP) return "daily_budget";
-  if (callsToday >= BUDGET.VISITOR_CALL_CAP) return "visitor_cap";
   if (activeCalls >= BUDGET.MAX_CONCURRENT) return "concurrency";
   return "ok";
 }
@@ -139,7 +131,7 @@ export const startCall = mutation({
 
     // Authoritative server-side guard. A blocked call throws — the client
     // should have called canStartCall() first and rendered the graceful state.
-    const reason = await guardCheck(ctx, args.visitorKey, now);
+    const reason = await guardCheck(ctx, now);
     if (reason !== "ok") {
       throw new Error(`call_blocked:${reason}`);
     }
@@ -216,12 +208,21 @@ export const getByVapiId = query({
 });
 
 // ── getById ───────────────────────────────────────────────────────────────────
+// Ownership-gated: the full call record carries PII (structuredData.booking =
+// customer name + contact), so we only return it to the visitor who owns the call.
+// We gate on `visitorKey` (NOT sessionId, which recordQualityMetrics uses): this
+// query is read by the /calls/[id] report page, which holds only the persisted
+// per-browser visitorKey — the per-call sessionId is an in-memory UUID it cannot
+// recover. startCall stores visitorKey on every call row, so the owner's browser
+// re-presents a matching key; a third party holding only a callId gets null,
+// identical to a missing call, so cross-visitor PII is never exposed.
 export const getById = query({
-  args: { callId: v.id("calls") },
+  args: { callId: v.id("calls"), visitorKey: v.string() },
   returns: v.union(v.any(), v.null()),
   handler: async (ctx, args) => {
     const call = await ctx.db.get(args.callId);
-    return call ?? null;
+    if (!call || call.visitorKey !== args.visitorKey) return null;
+    return call;
   },
 });
 

@@ -1,4 +1,4 @@
-import { Sparkles } from "lucide-react";
+import { Sparkle } from "@phosphor-icons/react/dist/ssr";
 import { cn } from "@/lib/utils";
 import type { ProviderKind, ProviderSource } from "@/lib/types";
 
@@ -39,7 +39,7 @@ export function ProviderChip({
       {showKind && kind && (
         <span className="font-mono text-[10px] uppercase text-muted-foreground">{KIND_LABEL[kind]}</span>
       )}
-      {custom && <Sparkles className="size-3 text-primary" />}
+      {custom && <Sparkle className="size-3 text-primary" />}
     </span>
   );
 }
@@ -54,7 +54,7 @@ export function SourcePill({ source, className }: { source: ProviderSource; clas
         className,
       )}
     >
-      {custom && <Sparkles className="size-2.5" />}
+      {custom && <Sparkle className="size-2.5" />}
       {custom ? "Custom" : "Native"}
     </span>
   );

@@ -5,16 +5,19 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
-  VAPI Voice Receptionist — design system (ui-development-plan.md §2)
-  Calm-but-technical: slate neutrals + one restrained blue accent.
+  VAPI Voice Receptionist — Signal Bold design system (ui-development-plan.md §2)
+  Warm paper + ink near-monochrome with one amber accent (orange-600 / orange-500 dark).
+  Typefaces: Space Grotesk (heading) · Hanken Grotesk (body) · IBM Plex Mono (data).
   Semantic tokens only; light + dark parity (dark is tuned, not a naive invert).
+  Note: `destructive` (shadcn) and `danger` (Signal Bold) resolve to the same hex;
+  consolidation is deferred — do not merge this pass.
 */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
-  --font-heading: var(--font-sans);
+  --font-heading: var(--font-heading);
 
   /* surfaces */
   --color-card: var(--card);
@@ -80,119 +83,122 @@
 }
 
 :root {
-  --radius: 0.75rem; /* 12px lg */
+  /* Signal Bold — warm paper + ink + one amber accent (near-mono + saturated pop) */
+  --radius: 0.7rem; /* ~11px lg */
 
-  --background: #fafafb;
-  --foreground: #0b0d12;
+  --background: #f4f4ee; /* warm paper */
+  --foreground: #121210; /* ink (no pure black) */
   --card: #ffffff;
-  --card-foreground: #0b0d12;
+  --card-foreground: #121210;
   --popover: #ffffff;
-  --popover-foreground: #0b0d12;
+  --popover-foreground: #121210;
 
-  --primary: #2563eb;
-  --primary-foreground: #ffffff;
-  --secondary: #f1f2f6;
-  --secondary-foreground: #0b0d12;
-  --muted: #f1f2f6;
-  --muted-foreground: #5a6173;
-  --accent: #eff6ff; /* light blue wash for hovers + selected rows */
-  --accent-foreground: #1d4ed8;
+  --primary: #ea580c; /* amber accent */
+  --primary-foreground: #1a1206; /* ink on amber — WCAG AA (white-on-amber fails) */
+  --secondary: #eaeae1;
+  --secondary-foreground: #121210;
+  --muted: #eaeae1;
+  --muted-foreground: #62625a;
+  --accent: #fbece1; /* warm amber wash for hovers + selected rows */
+  --accent-foreground: #9a3412;
 
-  --border: #e7e8ec;
-  --input: #e7e8ec;
-  --ring: #2563eb;
+  --border: #e1e1d8;
+  --input: #e1e1d8;
+  --ring: #ea580c;
 
   --destructive: #dc2626;
 
-  --success: #16a34a;
+  --success: #15803d;
   --success-foreground: #ffffff;
-  --success-subtle: rgba(22, 163, 74, 0.12);
-  --warning: #d97706;
+  --success-subtle: rgba(21, 128, 61, 0.12);
+  --warning: #ca8a04; /* yellow-amber, distinct from the orange accent */
   --warning-foreground: #ffffff;
-  --warning-subtle: rgba(217, 119, 6, 0.12);
+  --warning-subtle: rgba(202, 138, 4, 0.12);
   --danger: #dc2626;
   --danger-foreground: #ffffff;
   --danger-subtle: rgba(220, 38, 38, 0.12);
-  --info: #0ea5e9;
+  --info: #0d9488; /* teal, not default blue */
   --info-foreground: #ffffff;
-  --info-subtle: rgba(14, 165, 233, 0.12);
+  --info-subtle: rgba(13, 148, 136, 0.12);
 
+  /* FROZEN latency encoding — unchanged meaning app-wide */
   --latency-good: #16a34a;
   --latency-ok: #65a30d;
   --latency-slow: #d97706;
   --latency-bad: #dc2626;
 
-  --chart-1: #2563eb;
-  --chart-2: #0ea5e9;
-  --chart-3: #16a34a;
-  --chart-4: #d97706;
+  --chart-1: #ea580c;
+  --chart-2: #0d9488;
+  --chart-3: #15803d;
+  --chart-4: #ca8a04;
   --chart-5: #dc2626;
 
   --sidebar: #ffffff;
-  --sidebar-foreground: #0b0d12;
-  --sidebar-primary: #2563eb;
+  --sidebar-foreground: #121210;
+  --sidebar-primary: #ea580c;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #eff6ff;
-  --sidebar-accent-foreground: #1d4ed8;
-  --sidebar-border: #e7e8ec;
-  --sidebar-ring: #2563eb;
+  --sidebar-accent: #fbece1;
+  --sidebar-accent-foreground: #9a3412;
+  --sidebar-border: #e1e1d8;
+  --sidebar-ring: #ea580c;
 }
 
 .dark {
-  --background: #0b0d12;
-  --foreground: #fafafb;
-  --card: #14171f;
-  --card-foreground: #fafafb;
-  --popover: #14171f;
-  --popover-foreground: #fafafb;
+  /* Signal Bold dark — tuned, not a naive invert */
+  --background: #121210;
+  --foreground: #f4f4ee;
+  --card: #1b1b17;
+  --card-foreground: #f4f4ee;
+  --popover: #1b1b17;
+  --popover-foreground: #f4f4ee;
 
-  --primary: #3b82f6;
-  --primary-foreground: #ffffff;
-  --secondary: #1b1f2a;
-  --secondary-foreground: #fafafb;
-  --muted: #1b1f2a;
-  --muted-foreground: #9ca3b4;
-  --accent: #172554;
-  --accent-foreground: #bfdbfe;
+  --primary: #f97316; /* brighter amber for dark */
+  --primary-foreground: #1a1206;
+  --secondary: #232320;
+  --secondary-foreground: #f4f4ee;
+  --muted: #232320;
+  --muted-foreground: #9c9c92;
+  --accent: #2a1a10;
+  --accent-foreground: #fdba74;
 
-  --border: #232733;
-  --input: #232733;
-  --ring: #3b82f6;
+  --border: #2a2a24;
+  --input: #2a2a24;
+  --ring: #f97316;
 
   --destructive: #ef4444;
 
   --success: #22c55e;
   --success-foreground: #06210f;
   --success-subtle: rgba(34, 197, 94, 0.14);
-  --warning: #f59e0b;
+  --warning: #eab308;
   --warning-foreground: #231400;
-  --warning-subtle: rgba(245, 158, 11, 0.14);
+  --warning-subtle: rgba(234, 179, 8, 0.14);
   --danger: #ef4444;
   --danger-foreground: #2a0606;
   --danger-subtle: rgba(239, 68, 68, 0.14);
-  --info: #38bdf8;
+  --info: #2dd4bf;
   --info-foreground: #04212e;
-  --info-subtle: rgba(56, 189, 248, 0.14);
+  --info-subtle: rgba(45, 212, 191, 0.14);
 
   --latency-good: #22c55e;
   --latency-ok: #84cc16;
   --latency-slow: #f59e0b;
   --latency-bad: #ef4444;
 
-  --chart-1: #3b82f6;
-  --chart-2: #38bdf8;
+  --chart-1: #f97316;
+  --chart-2: #2dd4bf;
   --chart-3: #22c55e;
-  --chart-4: #f59e0b;
+  --chart-4: #eab308;
   --chart-5: #ef4444;
 
-  --sidebar: #14171f;
-  --sidebar-foreground: #fafafb;
-  --sidebar-primary: #3b82f6;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #172554;
-  --sidebar-accent-foreground: #bfdbfe;
-  --sidebar-border: #232733;
-  --sidebar-ring: #3b82f6;
+  --sidebar: #1b1b17;
+  --sidebar-foreground: #f4f4ee;
+  --sidebar-primary: #f97316;
+  --sidebar-primary-foreground: #1a1206;
+  --sidebar-accent: #2a1a10;
+  --sidebar-accent-foreground: #fdba74;
+  --sidebar-border: #2a2a24;
+  --sidebar-ring: #f97316;
 }
 
 @layer base {
@@ -206,6 +212,18 @@
   }
   html {
     @apply font-sans;
+  }
+  /* Signal Bold: display type on headings */
+  /*
+   * INTENTIONAL EXCEPTION to AGENTS.md "NEVER modify letter-spacing" rule.
+   * This -0.02em tight tracking on h1–h4 IS the explicitly requested Signal Bold
+   * design decision (memory.md "Locked decisions" / ui-development-plan.md §2).
+   * Future refactor: scope this to a `.display` utility + visually verify before
+   * removing the global rule — do not rip it out without a full browser check.
+   */
+  h1, h2, h3, h4 {
+    font-family: var(--font-heading);
+    letter-spacing: -0.02em;
   }
   /* all numbers/latencies/costs/IDs use tabular mono per §2 */
   .font-mono {
@@ -222,14 +240,6 @@
   animation: ticker 36s linear infinite;
 }
 
-@keyframes orb-pulse {
-  0% { box-shadow: 0 0 28px 4px color-mix(in oklab, var(--primary) 18%, transparent); transform: scale(0.99); }
-  100% { box-shadow: 0 0 52px 14px color-mix(in oklab, var(--primary) 32%, transparent); transform: scale(1.02); }
-}
-.animate-orb {
-  animation: orb-pulse 4s ease-in-out infinite alternate;
-}
-
 @keyframes pulse-ring {
   0% { transform: scale(0.7); opacity: 0.6; }
   100% { transform: scale(2.4); opacity: 0; }
@@ -238,12 +248,7 @@
   animation: pulse-ring 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
 }
 
-@keyframes eq-bar {
-  0%, 100% { transform: scaleY(0.35); }
-  50% { transform: scaleY(1); }
-}
-
-/* prefers-reduced-motion: disable orb/waveform/pulses/shimmer/slides → instant */
+/* prefers-reduced-motion: disable visualizer/waveform/pulses/shimmer/slides → instant */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

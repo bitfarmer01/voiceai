@@ -88,6 +88,28 @@ function endTs(evs: VapiEvent[]): number {
   return finals.length ? maxTs(finals) : maxTs(evs);
 }
 
+/** Words across an event window's text (for estimating speech duration). */
+function totalWords(evs: VapiEvent[]): number {
+  // Prefer the longest final text per window (partials are prefixes of the
+  // final); fall back to the longest text seen if there's no final.
+  const finals = evs.filter((e) => e.final && e.text);
+  const pool = (finals.length ? finals : evs).map((e) => e.text ?? "");
+  const longest = pool.reduce((a, b) => (b.length > a.length ? b : a), "");
+  return longest.trim().split(/\s+/).filter(Boolean).length;
+}
+
+/**
+ * Estimate a speaking window's duration (ms) from a word count, assuming a
+ * typical TTS speaking rate. Used to give single-`final` transcript turns a
+ * non-zero-width tts span (VAPI sometimes emits exactly one `final` per turn,
+ * collapsing minTs===maxTs → 0-width → wpm=0 / skewed talkRatio).
+ */
+const ASSUMED_WPM = 150;
+const MIN_SPEECH_MS = 400; // floor so a 1-word reply still has a sane window
+function estimateSpeechMs(words: number): number {
+  return Math.max(MIN_SPEECH_MS, Math.round((words / ASSUMED_WPM) * 60000));
+}
+
 /**
  * Reduce buffered VAPI events into trace spans, relative to call-start.
  */
@@ -138,7 +160,14 @@ export function deriveSpansFromEvents(
     const userStart = hasUser ? minTs(turn.user) : undefined;
     const userEnd = hasUser ? endTs(turn.user) : undefined;
     const asstStart = hasAsst ? minTs(turn.assistant) : undefined;
-    const asstEnd = hasAsst ? endTs(turn.assistant) : undefined;
+    // When VAPI emits a single `final` per assistant turn, minTs===maxTs →
+    // 0-width tts window (wpm=0, skewed talkRatio). Estimate the speaking
+    // duration from the assistant word count at an assumed rate so the span
+    // has a sane non-zero width.
+    let asstEnd = hasAsst ? endTs(turn.assistant) : undefined;
+    if (hasAsst && asstStart === asstEnd) {
+      asstEnd = asstStart! + estimateSpeechMs(totalWords(turn.assistant));
+    }
 
     // stt — user transcription window
     if (hasUser) {

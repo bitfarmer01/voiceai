@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, TrendingDown, TrendingUp } from "lucide-react";
+import { CircleNotch, TrendDown, TrendUp } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 import { formatMs, latencyTextClass } from "@/lib/format";
 import { EvalBadge } from "@/components/shared/status-badge";
@@ -69,7 +69,7 @@ export function EvalResults({ rows, onRowClick }: { rows: EvalRow[]; onRowClick?
               <TableCell>
                 {r.running ? (
                   <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <Loader2 className="size-3.5 animate-spin" /> Running
+                    <CircleNotch className="size-3.5 animate-spin" /> Running
                   </span>
                 ) : (
                   <EvalBadge status={r.status} />
@@ -90,7 +90,7 @@ export function EvalResults({ rows, onRowClick }: { rows: EvalRow[]; onRowClick?
                       r.deltaVsBaseline < 0 ? "text-danger" : r.deltaVsBaseline > 0 ? "text-success" : "text-muted-foreground",
                     )}
                   >
-                    {r.deltaVsBaseline < 0 ? <TrendingDown className="size-3" /> : r.deltaVsBaseline > 0 ? <TrendingUp className="size-3" /> : null}
+                    {r.deltaVsBaseline < 0 ? <TrendDown className="size-3" /> : r.deltaVsBaseline > 0 ? <TrendUp className="size-3" /> : null}
                     {r.deltaVsBaseline > 0 ? "+" : ""}
                     {Math.round(r.deltaVsBaseline * 100)}%
                   </span>

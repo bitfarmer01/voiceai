@@ -5,6 +5,17 @@ import schema from "./schema";
 
 const modules = import.meta.glob("./**/*.ts");
 
+// L5: a whitespace-heavy paste that exceeds MAX_TEXT_CHARS must be rejected, not
+// silently sliced. After trim() the content is empty, so the <50 guard fires BEFORE
+// any NIM call — making this assertable without mocking the AI SDK.
+test("ingestText: rejects a whitespace-only paste larger than MAX_TEXT_CHARS", async () => {
+  const t = convexTest(schema, modules);
+  const whitespaceHeavy = " ".repeat(60_000); // > 50_000 MAX_TEXT_CHARS, all whitespace
+  await expect(
+    t.action(api.sources.ingestText, { sessionId: "sess-ws", text: whitespaceHeavy }),
+  ).rejects.toThrow("ingest_failed: too little text");
+});
+
 test("insertUploadedBusiness: inserts business + chunks, sets expiresAt", async () => {
   const t = convexTest(schema, modules);
   const businessId = await t.mutation(internal.businesses.insertUploadedBusiness, {
@@ -64,4 +75,24 @@ test("getWithChunks: returns null for unknown businessId", async () => {
     businessId: "1businesses" as any,
   });
   expect(result).toBeNull();
+});
+
+test("insertUploadedBusiness with no storage args: inserts business, sourceMeta undefined, getWithChunks returns profile + chunks", async () => {
+  const t = convexTest(schema, modules);
+  const businessId = await t.mutation(internal.businesses.insertUploadedBusiness, {
+    sessionId: "s1",
+    companyName: "Acme",
+    hours: "9-5",
+    services: ["Consulting"],
+    policies: ["No refunds"],
+    availability: "Weekdays",
+    chunks: [{ text: "We open at 9am", tags: ["hours"] }],
+  });
+
+  expect(businessId).toBeTruthy();
+
+  const result = await t.query(api.businesses.getWithChunks, { businessId });
+  expect(result).not.toBeNull();
+  expect(result!.companyName).toBe("Acme");
+  expect(result!.chunks).toHaveLength(1);
 });

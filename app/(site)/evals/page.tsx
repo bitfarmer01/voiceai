@@ -1,7 +1,8 @@
 "use client";
 
-import { FlaskConical, TrendingDown } from "lucide-react";
+import { Flask, Info, TrendDown } from "@phosphor-icons/react";
 import { EvalBadge } from "@/components/shared/status-badge";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import {
   Table,
   TableBody,
@@ -46,7 +47,7 @@ export default function EvalsPage() {
   return (
     <div className="mx-auto w-full max-w-5xl px-4 py-10 sm:px-6">
       <div className="mb-8 flex items-start gap-3">
-        <FlaskConical className="mt-0.5 size-6 text-primary" />
+        <Flask className="mt-0.5 size-6 text-primary" />
         <div>
           <h1 className="text-2xl font-bold text-balance">Eval Harness</h1>
           <p className="mt-1 text-sm text-pretty text-muted-foreground">
@@ -55,13 +56,24 @@ export default function EvalsPage() {
         </div>
       </div>
 
+      {/* This page is a non-functional preview: the numbers below are an illustrative
+          sample, not a live eval run. Make that unmistakable up front. */}
+      <Alert variant="default" className="mb-6">
+        <Info />
+        <AlertTitle>Sample data.</AlertTitle>
+        <AlertDescription>
+          This page shows an illustrative eval run, not live results — the eval harness isn&apos;t wired to a backend yet.
+        </AlertDescription>
+      </Alert>
+
       {hasRegression && (
-        <div className="mb-6 flex items-start gap-3 rounded-xl border border-danger/30 bg-danger-subtle/20 px-4 py-3">
-          <TrendingDown className="mt-0.5 size-4 shrink-0 text-danger" />
-          <p className="text-sm text-danger">
-            <span className="font-medium">Regression detected.</span> Latest run failed against baseline.
-          </p>
-        </div>
+        <Alert variant="default" className="mb-6">
+          <TrendDown />
+          <AlertTitle>Regression detected (sample).</AlertTitle>
+          <AlertDescription>
+            In a live run, this banner flags when the latest run falls below baseline.
+          </AlertDescription>
+        </Alert>
       )}
 
       <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

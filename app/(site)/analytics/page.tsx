@@ -10,10 +10,11 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { Activity, Clock, DollarSign, Phone, TrendingUp } from "lucide-react";
+import { Pulse, Clock, CurrencyDollar, Phone, TrendUp } from "@phosphor-icons/react";
 import { api } from "@/convex/_generated/api";
 import { formatUsd, formatMs } from "@/lib/format";
 import { BudgetMeter } from "@/components/shared/budget-meter";
+import { DemoDataBadge } from "@/components/shared/demo-data-badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useBudgetState, useRecentCalls } from "@/lib/data";
 import type { CallSummary } from "@/lib/types";
@@ -79,7 +80,10 @@ export default function AnalyticsPage() {
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold">Analytics</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-2xl font-bold">Analytics</h1>
+          <DemoDataBadge />
+        </div>
         <p className="mt-1 text-sm text-muted-foreground">
           Aggregated from the last {calls.length} calls
         </p>
@@ -106,13 +110,13 @@ export default function AnalyticsPage() {
               sub="time to first word"
             />
             <KpiCard
-              icon={DollarSign}
+              icon={CurrencyDollar}
               label="Avg cost"
               value={formatUsd(avgCost, 3)}
               sub="per call"
             />
             <KpiCard
-              icon={TrendingUp}
+              icon={TrendUp}
               label="Booking rate"
               value={`${successRate}%`}
               sub={`${ended.length} calls sampled`}
@@ -164,7 +168,7 @@ export default function AnalyticsPage() {
       {/* Budget section */}
       <section className="rounded-xl border bg-card p-6">
         <h2 className="mb-4 text-sm font-semibold flex items-center gap-2">
-          <Activity className="size-4" />
+          <Pulse className="size-4" />
           Budget status
         </h2>
         <BudgetMeter budget={budget} />
