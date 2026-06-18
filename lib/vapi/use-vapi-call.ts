@@ -56,6 +56,29 @@ function prop(obj: unknown, key: string): unknown {
 }
 
 /**
+ * Does this VAPI message `type` carry tool/function activity?
+ *
+ * The explicit names are the shapes VAPI has shipped; we ALSO accept any type
+ * whose string contains "tool" or "function" (case-insensitive) so a renamed
+ * or newly-added variant doesn't silently drop tool spans on the floor.
+ * TODO(vapi-shape): the definitive set needs a live /try smoke test to confirm
+ * the exact message `type` values the SDK emits today.
+ */
+function isToolMessage(type: unknown): boolean {
+  if (typeof type !== "string") return false;
+  if (
+    type === "tool-calls" ||
+    type === "tool-calls-result" ||
+    type === "tool.completed" ||
+    type === "function-call-result"
+  ) {
+    return true;
+  }
+  const t = type.toLowerCase();
+  return t.includes("tool") || t.includes("function");
+}
+
+/**
  * Normalize a VAPI tool-call / tool-result client message into buffered events.
  * VAPI has shipped several shapes; cover the common ones defensively.
  * TODO(vapi-shape): reconcile against live client messages.
@@ -122,6 +145,20 @@ export function useVapiCall(): VapiCall {
   const timerRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
   const cappedRef = React.useRef(false);
 
+  // ── volume throttle ─────────────────────────────────────────────────────────
+  // VAPI fires volume-level tens of times/sec; committing each to state would
+  // re-render the whole TryPage per audio frame. Coalesce to ≤1 setState per
+  // animation frame (the visualizer can't show more than one frame anyway).
+  const pendingVolumeRef = React.useRef<number | null>(null);
+  const volumeRafRef = React.useRef<number | null>(null);
+  const cancelVolumeRaf = React.useCallback(() => {
+    if (volumeRafRef.current != null) {
+      cancelAnimationFrame(volumeRafRef.current);
+      volumeRafRef.current = null;
+    }
+    pendingVolumeRef.current = null;
+  }, []);
+
   // ── trace buffers ──────────────────────────────────────────────────────────
   const eventsRef = React.useRef<VapiEvent[]>([]);
   const turnsRef = React.useRef<TranscriptTurn[]>([]);
@@ -187,22 +224,36 @@ export function useVapiCall(): VapiCall {
           startMs: s.startMs,
           endMs: s.endMs,
         }));
-        const metrics = computeQualityMetrics(metricTurns, metricSpans);
-        try {
-          await recordQualityMetrics({ callId, sessionId, metrics });
-        } catch {
-          /* best-effort */
-        }
+        // Pass the raw buffered events so interruptions (barge-ins) can be
+        // computed from arrival timestamps — the derived spans are
+        // non-overlapping and can't reveal them. See computeQualityMetrics.
+        const metrics = computeQualityMetrics(metricTurns, metricSpans, eventsRef.current);
+        // Unlike spans/turns above (best-effort, retried next flush), the
+        // metrics write only happens on the FINAL flush — there is no next
+        // flush. Let it throw so runFinalFlush can surface + retry it.
+        await recordQualityMetrics({ callId, sessionId, metrics });
       }
     },
     [batchWriteSpans, recordTurns, recordQualityMetrics],
   );
 
-  /** Persist the final trace + metrics, guarded so it fires at most once per call. */
-  const runFinalFlush = React.useCallback(() => {
+  /**
+   * Persist the final trace + metrics, guarded so it fires at most once per
+   * call. Unlike the periodic flush, this is the LAST chance to land the report
+   * data — so we await it and, on failure, reset the once-guard and surface the
+   * error (via setError) so it's visible and the End button can retry.
+   */
+  const runFinalFlush = React.useCallback(async () => {
     if (finalFlushedRef.current) return;
     finalFlushedRef.current = true;
-    void flush(true);
+    try {
+      await flush(true);
+    } catch {
+      // Re-open the guard so a subsequent End/call-end can retry the flush,
+      // and surface the failure rather than silently dropping the report.
+      finalFlushedRef.current = false;
+      setError("Couldn't save the call report — it may be incomplete. Please retry.");
+    }
   }, [flush]);
 
   const startTimer = React.useCallback(() => {
@@ -245,16 +296,29 @@ export function useVapiCall(): VapiCall {
     const onCallEnd = () => {
       setStatus("ended");
       setAgentSpeaking(false);
+      cancelVolumeRaf();
       setVolume(0);
       stopTimer();
       stopFlushTimer();
       // Final flush: spans + finalized turns + quality metrics (no-op if End
-      // already triggered it).
-      runFinalFlush();
+      // already triggered it). It handles its own errors (resets the guard +
+      // setError on failure), so fire-and-forget is safe here.
+      void runFinalFlush();
     };
     const onSpeechStart = () => setAgentSpeaking(true);
     const onSpeechEnd = () => setAgentSpeaking(false);
-    const onVolume = (v: number) => setVolume(typeof v === "number" ? v : 0);
+    // Throttle to one commit per animation frame: stash the latest value and
+    // flush it on the next frame, coalescing the burst of intra-frame events.
+    const onVolume = (v: number) => {
+      pendingVolumeRef.current = typeof v === "number" ? v : 0;
+      if (volumeRafRef.current != null) return;
+      volumeRafRef.current = requestAnimationFrame(() => {
+        volumeRafRef.current = null;
+        const next = pendingVolumeRef.current;
+        pendingVolumeRef.current = null;
+        if (next != null) setVolume(next);
+      });
+    };
     const onError = (e: any) =>
       setError(e?.message ?? e?.error?.message ?? e?.errorMsg ?? "Call error — please retry.");
     const onMessage = (msg: any) => {
@@ -268,12 +332,7 @@ export function useVapiCall(): VapiCall {
           turnsRef.current = next;
           return next;
         });
-      } else if (
-        msg?.type === "tool-calls" ||
-        msg?.type === "tool-calls-result" ||
-        msg?.type === "tool.completed" ||
-        msg?.type === "function-call-result"
-      ) {
+      } else if (isToolMessage(msg?.type)) {
         eventsRef.current.push(...toolEventsFrom(msg, now));
       }
     };
@@ -296,8 +355,9 @@ export function useVapiCall(): VapiCall {
       vapi.off("error", onError);
       stopTimer();
       stopFlushTimer();
+      cancelVolumeRaf();
     };
-  }, [startTimer, stopTimer, stopFlushTimer, flush, runFinalFlush]);
+  }, [startTimer, stopTimer, stopFlushTimer, flush, runFinalFlush, cancelVolumeRaf]);
 
   const start = React.useCallback(
     async (assistant: unknown, callId: string, sessionId: string): Promise<string | null> => {
@@ -333,18 +393,20 @@ export function useVapiCall(): VapiCall {
     // leaving the End button looking dead. The later "call-end" just reaffirms this.
     setStatus((s) => (s === "live" || s === "connecting" ? "ended" : s));
     setAgentSpeaking(false);
+    cancelVolumeRaf();
     setVolume(0);
     stopTimer();
     stopFlushTimer();
-    // Persist the final trace + metrics now, so they land even if "call-end" never fires.
-    runFinalFlush();
+    // Persist the final trace + metrics now, so they land even if "call-end"
+    // never fires. runFinalFlush handles its own errors (guard reset + setError).
+    void runFinalFlush();
     try {
       getVapi().stop();
     } catch {
       // Don't swallow teardown failures silently — surface so they're detectable.
       setError("Couldn't cleanly end the call — it may take a moment to disconnect.");
     }
-  }, [stopTimer, stopFlushTimer, runFinalFlush]);
+  }, [stopTimer, stopFlushTimer, runFinalFlush, cancelVolumeRaf]);
 
   const toggleMute = React.useCallback(() => {
     const vapi = getVapi();
@@ -356,6 +418,7 @@ export function useVapiCall(): VapiCall {
   const reset = React.useCallback(() => {
     setStatus("idle");
     setTurns([]);
+    cancelVolumeRaf();
     setVolume(0);
     setError(null);
     setSecondsLeft(MAX_SECONDS);
@@ -365,7 +428,7 @@ export function useVapiCall(): VapiCall {
     callIdRef.current = null;
     sessionIdRef.current = null;
     finalFlushedRef.current = false;
-  }, []);
+  }, [cancelVolumeRaf]);
 
   return { status, turns, volume, agentSpeaking, muted, error, secondsLeft, start, stop, toggleMute, reset };
 }

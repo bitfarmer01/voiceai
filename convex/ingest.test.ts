@@ -5,6 +5,17 @@ import schema from "./schema";
 
 const modules = import.meta.glob("./**/*.ts");
 
+// L5: a whitespace-heavy paste that exceeds MAX_TEXT_CHARS must be rejected, not
+// silently sliced. After trim() the content is empty, so the <50 guard fires BEFORE
+// any NIM call — making this assertable without mocking the AI SDK.
+test("ingestText: rejects a whitespace-only paste larger than MAX_TEXT_CHARS", async () => {
+  const t = convexTest(schema, modules);
+  const whitespaceHeavy = " ".repeat(60_000); // > 50_000 MAX_TEXT_CHARS, all whitespace
+  await expect(
+    t.action(api.sources.ingestText, { sessionId: "sess-ws", text: whitespaceHeavy }),
+  ).rejects.toThrow("ingest_failed: too little text");
+});
+
 test("insertUploadedBusiness: inserts business + chunks, sets expiresAt", async () => {
   const t = convexTest(schema, modules);
   const businessId = await t.mutation(internal.businesses.insertUploadedBusiness, {

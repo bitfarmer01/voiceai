@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { CallStatus } from "@/lib/types";
@@ -15,8 +16,12 @@ const STATUS_LABEL: Record<CallStatus, string> = {
  * AgentStage — amplitude-reactive agent orb. Glow + equalizer bars scale with the
  * SDK volume level; speaking/listening/connecting states are visually distinct.
  * Motion is disabled under reduced-motion (global guard).
+ *
+ * Wrapped in React.memo: `volume` updates ~once/animation-frame during a call
+ * (throttled in useVapiCall). Memoizing keeps those frequent volume changes from
+ * forcing the rest of TryPage to re-render — only this component does.
  */
-export function AgentStage({
+function AgentStageImpl({
   status,
   volume,
   agentSpeaking,
@@ -90,3 +95,5 @@ export function AgentStage({
     </div>
   );
 }
+
+export const AgentStage = React.memo(AgentStageImpl);

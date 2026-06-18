@@ -58,25 +58,31 @@ export const ingestDocument = action({
 
     let rawText: string;
     if (isImageMime(args.mimeType)) {
-      const { createOpenAI } = await import("@ai-sdk/openai");
-      const { generateText } = await import("ai");
-      const nimVlm = createOpenAI({
-        baseURL: NIM_BASE_URL,
-        apiKey: process.env.NVIDIA_NIM_API_KEY ?? "",
-      });
-      const { text } = await generateText({
-        model: nimVlm(NIM_VLM_MODEL),
-        messages: [
-          {
-            role: "user",
-            content: [
-              { type: "image", image: toDataUrl(buffer, args.mimeType) },
-              { type: "text", text: buildOcrPrompt() },
-            ],
-          },
-        ],
-      });
-      rawText = text;
+      try {
+        const { createOpenAI } = await import("@ai-sdk/openai");
+        const { generateText } = await import("ai");
+        const nimVlm = createOpenAI({
+          baseURL: NIM_BASE_URL,
+          apiKey: process.env.NVIDIA_NIM_API_KEY ?? "",
+        });
+        const { text } = await generateText({
+          model: nimVlm(NIM_VLM_MODEL),
+          messages: [
+            {
+              role: "user",
+              content: [
+                { type: "image", image: toDataUrl(buffer, args.mimeType) },
+                { type: "text", text: buildOcrPrompt() },
+              ],
+            },
+          ],
+        });
+        rawText = text;
+      } catch {
+        // VLM 5xx / missing key / network error — normalize to the ingest_failed
+        // contract instead of leaking a raw SDK error.
+        throw new Error("ingest_failed: could not read image content");
+      }
     } else {
       try {
         rawText = await extractText(buffer, args.mimeType);

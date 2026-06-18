@@ -44,9 +44,16 @@ export function VoiceVisualizer({
   const barEls = React.useRef<(HTMLSpanElement | null)[]>([]);
   const [agent, setAgent] = React.useState(true); // who's speaking -> bar color
 
-  // latest live props, read by the rAF loop without re-subscribing
+  // latest live props AND mode, read by the rAF loop without re-subscribing.
+  // Written in an effect (not during render) so the loop sees fresh values without
+  // an illegal ref-mutation-during-render; the modeRef lets the loop read the
+  // current mode without tearing down and rebuilding on a demo->live switch.
   const liveRef = React.useRef({ level, speaking, active });
-  liveRef.current = { level, speaking, active };
+  const modeRef = React.useRef(mode);
+  React.useEffect(() => {
+    liveRef.current = { level, speaking, active };
+    modeRef.current = mode;
+  });
 
   React.useEffect(() => {
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -140,8 +147,9 @@ export function VoiceVisualizer({
     const frame = (now: number) => {
       const dt = Math.min(50, now - last);
       last = now;
+      const currentMode = modeRef.current;
 
-      if (mode === "demo") {
+      if (currentMode === "demo") {
         evTimer -= dt;
         if (evTimer <= 0) nextEvent();
         env += (envTarget - env) * (envTarget > env ? 0.45 : 0.2);
@@ -153,7 +161,7 @@ export function VoiceVisualizer({
 
       for (let i = 0; i < n; i++) {
         const target = Math.max(0.1, Math.min(1, env * gain[i] * (0.55 + 0.45 * specW[i])));
-        heights[i] += (target - heights[i]) * (mode === "demo" ? 0.35 : 0.3);
+        heights[i] += (target - heights[i]) * (currentMode === "demo" ? 0.35 : 0.3);
         setBar(i, heights[i]);
       }
       raf = requestAnimationFrame(frame);
@@ -169,9 +177,11 @@ export function VoiceVisualizer({
       raf = 0;
     };
 
+    // Set bars to their initial rest positions before the loop begins.
     for (let i = 0; i < n; i++) setBar(i, heights[i]);
-    start();
 
+    // Gate start() on IntersectionObserver: the loop only begins once the element
+    // is confirmed in-view. This prevents a few stray rAF frames on off-screen mounts.
     const io = new IntersectionObserver(
       ([e]) => {
         visible = e.isIntersecting;
@@ -193,7 +203,10 @@ export function VoiceVisualizer({
       io.disconnect();
       document.removeEventListener("visibilitychange", onVis);
     };
-  }, [bars, mode]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bars]);
+  // `mode` is intentionally excluded: it is read via modeRef inside the rAF loop,
+  // so a demo→live switch no longer tears down and rebuilds the animation loop.
 
   // live mode: flip bar color with the real speaker without restarting the loop
   React.useEffect(() => {

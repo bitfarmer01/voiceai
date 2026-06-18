@@ -73,6 +73,50 @@ test("batchWriteSpans is idempotent — re-flush upserts, no duplicates, updates
   expect(got[0].durationMs).toBe(500);
 });
 
+test("batchWriteSpans insert-then-update across two flushes — single record, field updated", async () => {
+  const t = convexTest(schema, modules);
+  const callId = await makeCall(t);
+
+  // First flush: three spans inserted fresh.
+  await t.mutation(api.telemetry.batchWriteSpans, {
+    callId,
+    sessionId: "sess-1",
+    spans: [
+      span(callId, "turn_1", { startMs: 0, endMs: 200, durationMs: 200 }),
+      span(callId, "stt_1", { kind: "stt", parentId: "turn_1", startMs: 10, endMs: 150, durationMs: 140 }),
+      span(callId, "tts_1", { kind: "tts", parentId: "turn_1", startMs: 160, endMs: 200, durationMs: 40 }),
+    ],
+  });
+
+  const afterFirst = await t.query(api.spans.listByTrace, { traceId: callId });
+  expect(afterFirst).toHaveLength(3);
+
+  // Second flush: re-sends all three, but turn_1 and tts_1 have grown windows.
+  await t.mutation(api.telemetry.batchWriteSpans, {
+    callId,
+    sessionId: "sess-1",
+    spans: [
+      span(callId, "turn_1", { startMs: 0, endMs: 500, durationMs: 500 }),   // grew
+      span(callId, "stt_1", { kind: "stt", parentId: "turn_1", startMs: 10, endMs: 150, durationMs: 140 }), // unchanged
+      span(callId, "tts_1", { kind: "tts", parentId: "turn_1", startMs: 160, endMs: 480, durationMs: 320 }), // grew
+    ],
+  });
+
+  const afterSecond = await t.query(api.spans.listByTrace, { traceId: callId });
+  // Still exactly 3 rows — no duplicates from the second flush.
+  expect(afterSecond).toHaveLength(3);
+
+  const byId = new Map(afterSecond.map((s) => [s.spanId, s]));
+  // turn_1 updated.
+  expect(byId.get("turn_1")!.endMs).toBe(500);
+  expect(byId.get("turn_1")!.durationMs).toBe(500);
+  // stt_1 unchanged.
+  expect(byId.get("stt_1")!.endMs).toBe(150);
+  // tts_1 updated.
+  expect(byId.get("tts_1")!.endMs).toBe(480);
+  expect(byId.get("tts_1")!.durationMs).toBe(320);
+});
+
 test("batchWriteSpans rejects spans not keyed to the passed call (no cross-trace contamination)", async () => {
   const t = convexTest(schema, modules);
   const callId = await makeCall(t);

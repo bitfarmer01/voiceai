@@ -102,6 +102,28 @@ test("startCall: throws call_blocked:total_budget when global cap hit", async ()
   );
 });
 
+test("getById: returns the row for the owning visitorKey and null for a non-owner", async () => {
+  const t = convexTest(schema, modules);
+  const businessId = await seedAndGetBusinessId(t);
+  // startOne stores visitorKey = "v1" on the call row.
+  const callId = await startOne(t, businessId, "v1");
+
+  const owned = await t.query(api.calls.getById, {
+    callId,
+    visitorKey: "v1",
+  });
+  expect(owned).not.toBeNull();
+  expect(owned._id).toBe(callId);
+
+  // A caller holding the callId but not the owning visitorKey gets null —
+  // the call's PII (structuredData.booking) is never exposed cross-visitor.
+  const denied = await t.query(api.calls.getById, {
+    callId,
+    visitorKey: "someone-elses-visitor",
+  });
+  expect(denied).toBeNull();
+});
+
 test("startCall: throws business_not_found for unknown businessId", async () => {
   const t = convexTest(schema, modules);
   await t.mutation(api.seedPresets.ensurePresets, {});

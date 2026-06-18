@@ -162,9 +162,13 @@ export const guardReasonValidator = v.union(
 );
 export type GuardReason = Infer<typeof guardReasonValidator>;
 
-/** Input to canStartCall(): the only thing it needs is who's asking. */
+/**
+ * Input to canStartCall(). `visitorKey` is optional: the per-visitor daily call
+ * cap has been removed, so the handler no longer reads it. The arg is retained
+ * (optional) for forward-compat should the cap be restored.
+ */
 export const canStartCallArgs = v.object({
-  visitorKey: v.string(),
+  visitorKey: v.optional(v.string()),
 });
 export type CanStartCallArgs = Infer<typeof canStartCallArgs>;
 

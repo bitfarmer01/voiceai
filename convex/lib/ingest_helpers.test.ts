@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   sanitize,
   sanitizeProfile,
@@ -11,6 +11,7 @@ import {
   clampFormInput,
   htmlToText,
   assertSafeUrl,
+  isPrivateOrReservedIp,
 } from "./ingest_helpers";
 import { z } from "zod";
 
@@ -134,9 +135,9 @@ describe("clampFormInput", () => {
 });
 
 describe("buildExtractionPrompt", () => {
-  it("contains 'Document:'", () => {
+  it("references the document to extract from", () => {
     const result = buildExtractionPrompt("test");
-    expect(result).toContain("Document:");
+    expect(result.toLowerCase()).toContain("document");
   });
 
   it("contains the passed text", () => {
@@ -148,6 +149,25 @@ describe("buildExtractionPrompt", () => {
   it("contains 'chunks'", () => {
     const result = buildExtractionPrompt("test");
     expect(result).toContain("chunks");
+  });
+
+  it("fences the ingested text in explicit untrusted-content delimiters", () => {
+    const text = "My custom text";
+    const result = buildExtractionPrompt(text);
+    expect(result).toContain("<<<UNTRUSTED_DOCUMENT");
+    expect(result).toContain("UNTRUSTED_DOCUMENT>>>");
+    // The fenced text sits between the open and close markers.
+    const open = result.indexOf("<<<UNTRUSTED_DOCUMENT");
+    const close = result.indexOf("UNTRUSTED_DOCUMENT>>>");
+    const textIdx = result.indexOf(text);
+    expect(textIdx).toBeGreaterThan(open);
+    expect(textIdx).toBeLessThan(close);
+  });
+
+  it("instructs the model to treat the delimited content as data only", () => {
+    const result = buildExtractionPrompt("test");
+    expect(result.toLowerCase()).toContain("untrusted");
+    expect(result.toLowerCase()).toMatch(/not instructions|never follow|ignore any/);
   });
 });
 
@@ -232,55 +252,212 @@ describe("htmlToText", () => {
     const result = htmlToText(html);
     expect(result).toBe("Hello & world");
   });
+
+  it("decodes hex numeric entities (&#x27;)", () => {
+    const html = "<p>it&#x27;s here</p>";
+    const result = htmlToText(html);
+    expect(result).toBe("it's here");
+  });
+
+  it("decodes decimal numeric entities (&#8212;)", () => {
+    const html = "<p>a &#8212; b</p>";
+    const result = htmlToText(html);
+    expect(result).toBe("a — b");
+  });
+
+  it("decodes &mdash; named entity", () => {
+    const html = "<p>a &mdash; b</p>";
+    const result = htmlToText(html);
+    expect(result).toBe("a — b");
+  });
+
+  it("decodes &copy; and &hellip; named entities", () => {
+    const html = "<p>&copy; 2026&hellip;</p>";
+    const result = htmlToText(html);
+    expect(result).toBe("© 2026…");
+  });
+
+  it("decodes &apos; named entity", () => {
+    const html = "<p>it&apos;s</p>";
+    const result = htmlToText(html);
+    expect(result).toBe("it's");
+  });
+});
+
+describe("isPrivateOrReservedIp", () => {
+  it("flags IPv4 link-local / cloud metadata 169.254.169.254", () => {
+    expect(isPrivateOrReservedIp("169.254.169.254")).toBe(true);
+  });
+
+  it("flags IPv4-mapped IPv6 loopback ::ffff:127.0.0.1", () => {
+    expect(isPrivateOrReservedIp("::ffff:127.0.0.1")).toBe(true);
+  });
+
+  it("flags 0.0.0.1 (0/8)", () => {
+    expect(isPrivateOrReservedIp("0.0.0.1")).toBe(true);
+  });
+
+  it("flags 10.0.0.1 (10/8)", () => {
+    expect(isPrivateOrReservedIp("10.0.0.1")).toBe(true);
+  });
+
+  it("flags 172.16.0.1 and 172.31.255.255 (172.16/12)", () => {
+    expect(isPrivateOrReservedIp("172.16.0.1")).toBe(true);
+    expect(isPrivateOrReservedIp("172.31.255.255")).toBe(true);
+  });
+
+  it("flags 192.168.1.1 (192.168/16)", () => {
+    expect(isPrivateOrReservedIp("192.168.1.1")).toBe(true);
+  });
+
+  it("flags 127.0.0.1 (127/8 loopback)", () => {
+    expect(isPrivateOrReservedIp("127.0.0.1")).toBe(true);
+  });
+
+  it("flags 100.64.0.1 (CGNAT 100.64/10)", () => {
+    expect(isPrivateOrReservedIp("100.64.0.1")).toBe(true);
+  });
+
+  it("flags IPv6 ::1, fc00::, fe80::", () => {
+    expect(isPrivateOrReservedIp("::1")).toBe(true);
+    expect(isPrivateOrReservedIp("fc00::1")).toBe(true);
+    expect(isPrivateOrReservedIp("fd12:3456::1")).toBe(true);
+    expect(isPrivateOrReservedIp("fe80::1")).toBe(true);
+  });
+
+  it("returns false for public IPv4 addresses", () => {
+    expect(isPrivateOrReservedIp("93.184.216.34")).toBe(false); // example.com
+    expect(isPrivateOrReservedIp("8.8.8.8")).toBe(false);
+    expect(isPrivateOrReservedIp("1.1.1.1")).toBe(false);
+    expect(isPrivateOrReservedIp("172.15.0.1")).toBe(false); // just below 172.16/12
+    expect(isPrivateOrReservedIp("172.32.0.1")).toBe(false); // just above 172.16/12
+    expect(isPrivateOrReservedIp("100.63.255.255")).toBe(false); // just below CGNAT
+    expect(isPrivateOrReservedIp("100.128.0.1")).toBe(false); // just above CGNAT
+  });
+
+  it("returns false for public IPv6 addresses", () => {
+    expect(isPrivateOrReservedIp("2606:2800:220:1:248:1893:25c8:1946")).toBe(false); // example.com
+    expect(isPrivateOrReservedIp("2001:4860:4860::8888")).toBe(false); // Google DNS
+  });
+
+  it("fails closed for unparseable / malformed input", () => {
+    expect(isPrivateOrReservedIp("not-an-ip")).toBe(true);
+    expect(isPrivateOrReservedIp("10.0.0")).toBe(true);
+    expect(isPrivateOrReservedIp("999.0.0.1")).toBe(true);
+  });
 });
 
 describe("assertSafeUrl", () => {
-  it("allows https://example.com", () => {
-    expect(() => assertSafeUrl("https://example.com")).not.toThrow();
+  // Hermetic DNS stubs injected via the optional `lookup` param — no real network.
+  const publicLookup = vi.fn(async () => [{ address: "93.184.216.34" }]); // public IPv4
+  const privateLookup = vi.fn(async () => [{ address: "169.254.169.254" }]); // cloud metadata
+
+  it("allows https://example.com when it resolves to a public IP", async () => {
+    await expect(
+      assertSafeUrl("https://example.com", publicLookup)
+    ).resolves.toBeUndefined();
   });
 
-  it("allows http://example.com/path", () => {
-    expect(() => assertSafeUrl("http://example.com/path")).not.toThrow();
+  it("allows http://example.com/path when it resolves to a public IP", async () => {
+    await expect(
+      assertSafeUrl("http://example.com/path", publicLookup)
+    ).resolves.toBeUndefined();
   });
 
-  it("throws for http://localhost", () => {
-    expect(() => assertSafeUrl("http://localhost")).toThrow("ingest_failed: invalid or unsafe URL");
+  it("rejects when DNS resolves a hostname to a private IP (DNS-rebind)", async () => {
+    await expect(
+      assertSafeUrl("https://rebind.example.com", privateLookup)
+    ).rejects.toThrow("ingest_failed: invalid or unsafe URL");
   });
 
-  it("throws for http://127.0.0.1", () => {
-    expect(() => assertSafeUrl("http://127.0.0.1")).toThrow("ingest_failed: invalid or unsafe URL");
+  it("rejects when DNS resolution fails (cannot prove safe)", async () => {
+    const failingLookup = vi.fn(async () => {
+      throw new Error("ENOTFOUND");
+    });
+    await expect(
+      assertSafeUrl("https://nope.example.com", failingLookup)
+    ).rejects.toThrow("ingest_failed: invalid or unsafe URL");
   });
 
-  it("throws for http://192.168.1.1", () => {
-    expect(() => assertSafeUrl("http://192.168.1.1")).toThrow("ingest_failed: invalid or unsafe URL");
+  // The reject-cases below all throw on the synchronous pre-filter, BEFORE any DNS,
+  // so the injected lookup is never consulted (passing publicLookup proves this).
+
+  it("throws for http://localhost", async () => {
+    await expect(assertSafeUrl("http://localhost", publicLookup)).rejects.toThrow(
+      "ingest_failed: invalid or unsafe URL"
+    );
   });
 
-  it("throws for http://10.0.0.1", () => {
-    expect(() => assertSafeUrl("http://10.0.0.1")).toThrow("ingest_failed: invalid or unsafe URL");
+  it("throws for http://127.0.0.1", async () => {
+    await expect(assertSafeUrl("http://127.0.0.1", publicLookup)).rejects.toThrow(
+      "ingest_failed: invalid or unsafe URL"
+    );
   });
 
-  it("throws for http://172.16.0.1", () => {
-    expect(() => assertSafeUrl("http://172.16.0.1")).toThrow("ingest_failed: invalid or unsafe URL");
+  it("throws for http://192.168.1.1", async () => {
+    await expect(assertSafeUrl("http://192.168.1.1", publicLookup)).rejects.toThrow(
+      "ingest_failed: invalid or unsafe URL"
+    );
   });
 
-  it("throws for http://172.31.255.255", () => {
-    expect(() => assertSafeUrl("http://172.31.255.255")).toThrow("ingest_failed: invalid or unsafe URL");
+  it("throws for http://10.0.0.1", async () => {
+    await expect(assertSafeUrl("http://10.0.0.1", publicLookup)).rejects.toThrow(
+      "ingest_failed: invalid or unsafe URL"
+    );
   });
 
-  it("throws for http://my.local", () => {
-    expect(() => assertSafeUrl("http://my.local")).toThrow("ingest_failed: invalid or unsafe URL");
+  it("throws for http://172.16.0.1", async () => {
+    await expect(assertSafeUrl("http://172.16.0.1", publicLookup)).rejects.toThrow(
+      "ingest_failed: invalid or unsafe URL"
+    );
   });
 
-  it("throws for ftp://example.com", () => {
-    expect(() => assertSafeUrl("ftp://example.com")).toThrow("ingest_failed: invalid or unsafe URL");
+  it("throws for http://172.31.255.255", async () => {
+    await expect(assertSafeUrl("http://172.31.255.255", publicLookup)).rejects.toThrow(
+      "ingest_failed: invalid or unsafe URL"
+    );
   });
 
-  it("throws for file:///etc/passwd", () => {
-    expect(() => assertSafeUrl("file:///etc/passwd")).toThrow("ingest_failed: invalid or unsafe URL");
+  it("throws for http://169.254.169.254 (cloud metadata)", async () => {
+    await expect(assertSafeUrl("http://169.254.169.254", publicLookup)).rejects.toThrow(
+      "ingest_failed: invalid or unsafe URL"
+    );
   });
 
-  it("throws for not-a-url", () => {
-    expect(() => assertSafeUrl("not-a-url")).toThrow("ingest_failed: invalid or unsafe URL");
+  it("throws for http://0.0.0.1 (0/8)", async () => {
+    await expect(assertSafeUrl("http://0.0.0.1", publicLookup)).rejects.toThrow(
+      "ingest_failed: invalid or unsafe URL"
+    );
+  });
+
+  it("throws for http://[::ffff:127.0.0.1] (IPv4-mapped IPv6 loopback)", async () => {
+    await expect(assertSafeUrl("http://[::ffff:127.0.0.1]", publicLookup)).rejects.toThrow(
+      "ingest_failed: invalid or unsafe URL"
+    );
+  });
+
+  it("throws for http://my.local", async () => {
+    await expect(assertSafeUrl("http://my.local", publicLookup)).rejects.toThrow(
+      "ingest_failed: invalid or unsafe URL"
+    );
+  });
+
+  it("throws for ftp://example.com", async () => {
+    await expect(assertSafeUrl("ftp://example.com", publicLookup)).rejects.toThrow(
+      "ingest_failed: invalid or unsafe URL"
+    );
+  });
+
+  it("throws for file:///etc/passwd", async () => {
+    await expect(assertSafeUrl("file:///etc/passwd", publicLookup)).rejects.toThrow(
+      "ingest_failed: invalid or unsafe URL"
+    );
+  });
+
+  it("throws for not-a-url", async () => {
+    await expect(assertSafeUrl("not-a-url", publicLookup)).rejects.toThrow(
+      "ingest_failed: invalid or unsafe URL"
+    );
   });
 });
 

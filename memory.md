@@ -1,6 +1,6 @@
 # Memory — Signal Bold UI + BYOD/appointment + Phase 3 telemetry
 
-Last updated: 2026-06-18 (craft-sweep audit + plan) · Branch: `feature/byod-try-page`
+Last updated: 2026-06-18 (code-review remediation — 23 findings fixed) · Branch: `feature/byod-try-page`
 
 > ⚠️ **Two gotchas that bite first:**
 > 1. **Committed vs uncommitted on this branch.** Already committed (ahead of `main`): Phase 3 telemetry
@@ -11,6 +11,43 @@ Last updated: 2026-06-18 (craft-sweep audit + plan) · Branch: `feature/byod-try
 > 2. **Convex dev deployment is AHEAD of `main`** (main lacks Phase 3 telemetry, commit `1e62781`).
 >    Deploying main or a pre-Phase-3 branch to it reintroduces `ArgumentValidationError` on
 >    `telemetry.batchWriteSpans`. Keep `convex dev` running; whatever merges MUST include `1e62781`.
+
+## Code-review remediation — Next.js best-practices pass (2026-06-18, uncommitted)
+
+Ran a multi-agent `/code-review` (Next.js 16 focus) over the full diff (committed BYOD + uncommitted UI):
+72 raw → 39 unique → **23 verified findings**, then **fixed all 23** via 5 file-disjoint parallel
+subagents + integration. ✅ `pnpm typecheck` 0 errors · 169/169 tests (added ~25 new) · **no new lint**
+(removed 2 voice-visualizer ref-in-render errors; 7 remaining are all pre-existing `any`/unused-var/
+set-state-in-effect). Final adversarial review verdict: **READY, no Critical/Important.** Nothing committed.
+
+**Two new gotchas this introduced:**
+- **`convex/lib/ingest_helpers.ts` is now `"use node"`** (line 1). The SSRF fix (H1) resolves hostnames via
+  `node:dns`, which only bundles in Convex's Node runtime. Its only importers (`sources.ts`, `ingest.ts`) are
+  already `"use node"` — do NOT import it from a V8-runtime query/mutation or `convex codegen` fails to bundle.
+- **`calls.getById` is now ownership-gated on `visitorKey`** (NOT sessionId). The `/calls/[id]` report page is
+  therefore **owner-only**: a third party opening a shared link gets `null` → "Call not found". This closes the
+  PII/IDOR (M2) but means the public `/calls` feed → report navigation only works for the call's own visitor.
+  If public report viewing is wanted, add a separate PII-stripped single-call query. `recordQualityMetrics`
+  still gates on `sessionId` (the active-call client has it); `getById` gates on `visitorKey` (the report page
+  only has that, persisted via `useVisitorKey`; `startCall` stores it on every row).
+
+**What got fixed (by area):** SSRF blocklist→DNS-resolution + `isPrivateOrReservedIp` (H1); ICS route
+try/catch + NaN-safe slot parse, 404-not-500 on malformed id (H2/N1); `sanitize()` honest docstring +
+untrusted-text fence in `buildExtractionPrompt` (M1); `getById` visitorKey gate (M2); `runFinalFlush`
+await+retry+setError (M4); `interruptions` now computed from raw events not always-0 spans + false-passing
+test fixed (M3); `wpm` tts-duration estimate for single-final turns (M5); broadened tool-message gate (M6);
+deadAir includes llm spans (L3); image-OCR error normalized (L4); ingestText trim-before-measure (L5);
+htmlToText numeric/hex entities (L6); recordTurns skip-unchanged-patch (L1); batchWriteSpans N+1→single
+collect (L2); volume rAF-throttle + AgentStage memo (N2); `viewport` themeColor/colorScheme (N3); url/paste
+`<form>` + Enter/Cmd-Enter submit (V1); canStartCall visitorKey→optional (C2); try/page indent (C3);
+voice-visualizer in-view-gated rAF + mode-ref (C4); `extractAndInsert` dedup (C1); globals.css letter-spacing
+documented as Signal-Bold exception (V2, NOT re-scoped — left for a visual pass).
+
+**Still needs a live `/try` smoke test (interim mitigations shipped, not settled in code):** **M6** (confirm
+real VAPI message `type` strings populate tool spans) and **M5/M3** (confirm single-final transcript shape +
+that VAPI interleaves barge-in transcripts) — same smoke test already pending for the `ended`-state visual.
+**Residual SSRF TOCTOU** (validated IP vs. fetch re-resolving DNS) and NAT64/6to4 IPv6 unwrap left as
+documented low-risk hardening.
 
 ## Dummy-data cleanup (2026-06-18, uncommitted)
 

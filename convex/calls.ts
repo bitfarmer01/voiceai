@@ -208,12 +208,21 @@ export const getByVapiId = query({
 });
 
 // ── getById ───────────────────────────────────────────────────────────────────
+// Ownership-gated: the full call record carries PII (structuredData.booking =
+// customer name + contact), so we only return it to the visitor who owns the call.
+// We gate on `visitorKey` (NOT sessionId, which recordQualityMetrics uses): this
+// query is read by the /calls/[id] report page, which holds only the persisted
+// per-browser visitorKey — the per-call sessionId is an in-memory UUID it cannot
+// recover. startCall stores visitorKey on every call row, so the owner's browser
+// re-presents a matching key; a third party holding only a callId gets null,
+// identical to a missing call, so cross-visitor PII is never exposed.
 export const getById = query({
-  args: { callId: v.id("calls") },
+  args: { callId: v.id("calls"), visitorKey: v.string() },
   returns: v.union(v.any(), v.null()),
   handler: async (ctx, args) => {
     const call = await ctx.db.get(args.callId);
-    return call ?? null;
+    if (!call || call.visitorKey !== args.visitorKey) return null;
+    return call;
   },
 });
 

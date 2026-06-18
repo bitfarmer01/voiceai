@@ -26,7 +26,9 @@ function dayBucket(ms: number): string {
 }
 
 export const canStartCall = query({
-  args: { visitorKey: v.string() },
+  // visitorKey is optional and unread — the per-visitor daily cap is removed
+  // (see header). Retained for forward-compat. Mirrors _contracts.canStartCallArgs.
+  args: { visitorKey: v.optional(v.string()) },
   returns: v.object({
     allowed: v.boolean(),
     reason: guardReasonValidator,

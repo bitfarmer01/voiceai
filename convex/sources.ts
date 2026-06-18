@@ -1,6 +1,7 @@
 "use node";
 
 import { action } from "./_generated/server";
+import type { ActionCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
@@ -18,6 +19,42 @@ const NIM_BASE_URL = "https://integrate.api.nvidia.com/v1";
 const NIM_MODEL = "nvidia/nemotron-3-nano-30b-a3b";
 const MAX_TEXT_CHARS = 50_000;
 
+/**
+ * Shared extraction + insert pipeline used by every ingest source.
+ * Runs the NIM structured-extraction call against the given prompt, sanitizes the
+ * resulting profile, and inserts the uploaded business. Only the prompt differs
+ * between sources (document extraction vs. form expansion).
+ */
+async function extractAndInsert(
+  ctx: ActionCtx,
+  sessionId: string,
+  prompt: string,
+): Promise<{ businessId: Id<"businesses"> }> {
+  const { createOpenAI } = await import("@ai-sdk/openai");
+  const { generateObject } = await import("ai");
+  const { z } = await import("zod");
+
+  const nim = createOpenAI({
+    baseURL: NIM_BASE_URL,
+    apiKey: process.env.NVIDIA_NIM_API_KEY ?? "",
+  });
+
+  const { object } = await generateObject({
+    model: nim(NIM_MODEL),
+    schema: businessProfileSchema(z),
+    prompt,
+  });
+
+  const sanitized = sanitizeProfile(object);
+
+  const businessId = await ctx.runMutation(internal.businesses.insertUploadedBusiness, {
+    sessionId,
+    ...sanitized,
+  });
+
+  return { businessId };
+}
+
 export const ingestText = action({
   args: {
     sessionId: v.string(),
@@ -25,33 +62,11 @@ export const ingestText = action({
   },
   returns: v.object({ businessId: v.id("businesses") }),
   handler: async (ctx, args): Promise<{ businessId: Id<"businesses"> }> => {
-    const text =
-      args.text.length > MAX_TEXT_CHARS ? args.text.slice(0, MAX_TEXT_CHARS) : args.text.trim();
+    const trimmed = args.text.trim();
+    const text = trimmed.length > MAX_TEXT_CHARS ? trimmed.slice(0, MAX_TEXT_CHARS) : trimmed;
     if (text.length < 50) throw new Error("ingest_failed: too little text");
 
-    const { createOpenAI } = await import("@ai-sdk/openai");
-    const { generateObject } = await import("ai");
-    const { z } = await import("zod");
-
-    const nim = createOpenAI({
-      baseURL: NIM_BASE_URL,
-      apiKey: process.env.NVIDIA_NIM_API_KEY ?? "",
-    });
-
-    const { object } = await generateObject({
-      model: nim(NIM_MODEL),
-      schema: businessProfileSchema(z),
-      prompt: buildExtractionPrompt(text),
-    });
-
-    const sanitized = sanitizeProfile(object);
-
-    const businessId = await ctx.runMutation(internal.businesses.insertUploadedBusiness, {
-      sessionId: args.sessionId,
-      ...sanitized,
-    });
-
-    return { businessId };
+    return extractAndInsert(ctx, args.sessionId, buildExtractionPrompt(text));
   },
 });
 
@@ -62,7 +77,7 @@ export const ingestUrl = action({
   },
   returns: v.object({ businessId: v.id("businesses") }),
   handler: async (ctx, args): Promise<{ businessId: Id<"businesses"> }> => {
-    assertSafeUrl(args.url);
+    await assertSafeUrl(args.url);
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10_000);
@@ -108,29 +123,7 @@ export const ingestUrl = action({
     if (rawText.trim().length < 50) throw new Error("ingest_failed: too little text extracted from URL");
     const text = rawText.length > MAX_TEXT_CHARS ? rawText.slice(0, MAX_TEXT_CHARS) : rawText;
 
-    const { createOpenAI } = await import("@ai-sdk/openai");
-    const { generateObject } = await import("ai");
-    const { z } = await import("zod");
-
-    const nim = createOpenAI({
-      baseURL: NIM_BASE_URL,
-      apiKey: process.env.NVIDIA_NIM_API_KEY ?? "",
-    });
-
-    const { object } = await generateObject({
-      model: nim(NIM_MODEL),
-      schema: businessProfileSchema(z),
-      prompt: buildExtractionPrompt(text),
-    });
-
-    const sanitized = sanitizeProfile(object);
-
-    const businessId = await ctx.runMutation(internal.businesses.insertUploadedBusiness, {
-      sessionId: args.sessionId,
-      ...sanitized,
-    });
-
-    return { businessId };
+    return extractAndInsert(ctx, args.sessionId, buildExtractionPrompt(text));
   },
 });
 
@@ -149,28 +142,6 @@ export const generateFromForm = action({
       description: args.description,
     });
 
-    const { createOpenAI } = await import("@ai-sdk/openai");
-    const { generateObject } = await import("ai");
-    const { z } = await import("zod");
-
-    const nim = createOpenAI({
-      baseURL: NIM_BASE_URL,
-      apiKey: process.env.NVIDIA_NIM_API_KEY ?? "",
-    });
-
-    const { object } = await generateObject({
-      model: nim(NIM_MODEL),
-      schema: businessProfileSchema(z),
-      prompt: buildFormExpansionPrompt(clamped),
-    });
-
-    const sanitized = sanitizeProfile(object);
-
-    const businessId = await ctx.runMutation(internal.businesses.insertUploadedBusiness, {
-      sessionId: args.sessionId,
-      ...sanitized,
-    });
-
-    return { businessId };
+    return extractAndInsert(ctx, args.sessionId, buildFormExpansionPrompt(clamped));
   },
 });

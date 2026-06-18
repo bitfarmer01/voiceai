@@ -10,6 +10,7 @@ async function makeCall(t: ReturnType<typeof convexTest>): Promise<Id<"calls">> 
   return await t.run(async (ctx) => {
     return await ctx.db.insert("calls", {
       sessionId: "sess-1",
+      visitorKey: "visitor-1",
       businessId: "1businesses" as Id<"businesses">,
       businessName: "Test Co",
       status: "ended",
@@ -35,7 +36,7 @@ test("recordQualityMetrics patches the four deterministic metrics (sentiment omi
     metrics: { talkRatio: 0.6, interruptions: 1, deadAirSec: 2.5, wpm: 180 },
   });
 
-  const call = await t.query(api.calls.getById, { callId });
+  const call = await t.query(api.calls.getById, { callId, visitorKey: "visitor-1" });
   expect(call.qualityMetrics).toEqual({
     talkRatio: 0.6,
     interruptions: 1,
@@ -55,7 +56,7 @@ test("recordQualityMetrics clamps out-of-range values", async () => {
     metrics: { talkRatio: 5, interruptions: -3, deadAirSec: -1, wpm: -10 },
   });
 
-  const call = await t.query(api.calls.getById, { callId });
+  const call = await t.query(api.calls.getById, { callId, visitorKey: "visitor-1" });
   expect(call.qualityMetrics).toEqual({
     talkRatio: 1, // clamped to [0,1]
     interruptions: 0, // clamped to >= 0
@@ -74,7 +75,7 @@ test("recordQualityMetrics rejects a caller whose sessionId does not own the cal
     metrics: { talkRatio: 0.5, interruptions: 0, deadAirSec: 0, wpm: 100 },
   });
 
-  const call = await t.query(api.calls.getById, { callId });
+  const call = await t.query(api.calls.getById, { callId, visitorKey: "visitor-1" });
   expect(call.qualityMetrics).toBeUndefined(); // nothing written
 });
 
@@ -89,6 +90,6 @@ test("recordQualityMetrics drops silently for an unknown call", async () => {
     metrics: { talkRatio: 1, interruptions: 0, deadAirSec: 0, wpm: 100 },
   });
 
-  const call = await t.query(api.calls.getById, { callId });
+  const call = await t.query(api.calls.getById, { callId, visitorKey: "visitor-1" });
   expect(call).toBeNull();
 });

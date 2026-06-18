@@ -18,12 +18,13 @@ export function UrlInput({ onSubmit, state, disabled }: UrlInputProps) {
   const isLoading = state.status === "analyzing";
   const isDisabled = disabled || isLoading;
 
-  const handleClick = () => {
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
     void onSubmit(url);
   };
 
   return (
-    <div className="space-y-4">
+    <form className="space-y-4" onSubmit={handleSubmit}>
       <Input
         type="url"
         placeholder="https://yourbusiness.com"
@@ -38,7 +39,7 @@ export function UrlInput({ onSubmit, state, disabled }: UrlInputProps) {
         </p>
       )}
 
-      <Button type="button" className="w-full" onClick={handleClick} disabled={isDisabled}>
+      <Button type="submit" className="w-full" disabled={isDisabled}>
         {isLoading ? (
           <>
             <CircleNotch className="size-4 animate-spin" />
@@ -48,6 +49,6 @@ export function UrlInput({ onSubmit, state, disabled }: UrlInputProps) {
           "Fetch site"
         )}
       </Button>
-    </div>
+    </form>
   );
 }

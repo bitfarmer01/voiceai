@@ -18,17 +18,26 @@ export function TextPaste({ onSubmit, state, disabled }: TextPasteProps) {
   const isLoading = state.status === "analyzing";
   const isDisabled = disabled || isLoading;
 
-  const handleClick = () => {
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
     void onSubmit(text);
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+      e.preventDefault();
+      void onSubmit(text);
+    }
+  };
+
   return (
-    <div className="space-y-4">
+    <form className="space-y-4" onSubmit={handleSubmit}>
       <Textarea
         placeholder="Paste your About page, FAQ, or any business description here…"
         rows={8}
         value={text}
         onChange={(e) => setText(e.target.value)}
+        onKeyDown={handleKeyDown}
         disabled={isDisabled}
       />
 
@@ -38,7 +47,7 @@ export function TextPaste({ onSubmit, state, disabled }: TextPasteProps) {
         </p>
       )}
 
-      <Button type="button" className="w-full" onClick={handleClick} disabled={isDisabled}>
+      <Button type="submit" className="w-full" disabled={isDisabled}>
         {isLoading ? (
           <>
             <CircleNotch className="size-4 animate-spin" />
@@ -48,6 +57,6 @@ export function TextPaste({ onSubmit, state, disabled }: TextPasteProps) {
           "Use this text"
         )}
       </Button>
-    </div>
+    </form>
   );
 }

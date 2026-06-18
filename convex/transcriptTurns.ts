@@ -69,21 +69,35 @@ export const recordTurns = mutation({
       .query("transcriptTurns")
       .withIndex("by_call", (q) => q.eq("callId", args.callId))
       .collect();
-    const byIdx = new Map(existing.map((t) => [t.idx, t._id]));
+
+    // Build a full map of existing rows so we can (a) detect new turns and
+    // (b) skip patches when nothing has changed — the client re-sends the
+    // full finalized list on every ~5s flush, so most patches are no-ops
+    // without this guard.
+    const existingByIdx = new Map(existing.map((t) => [t.idx, t]));
 
     for (const turn of args.turns) {
-      const prevId = byIdx.get(turn.idx);
+      const prev = existingByIdx.get(turn.idx);
       const fields = {
         callId: args.callId,
         idx: turn.idx,
         role: turn.role,
         text: turn.text,
         ts: turn.ts,
-        interim: false,
+        interim: false as const,
         confidence: turn.confidence,
       };
-      if (prevId) {
-        await ctx.db.patch(prevId, fields);
+      if (prev) {
+        // Skip the write entirely when every meaningful field is unchanged.
+        const unchanged =
+          prev.role === fields.role &&
+          prev.text === fields.text &&
+          prev.ts === fields.ts &&
+          prev.interim === fields.interim &&
+          prev.confidence === fields.confidence;
+        if (!unchanged) {
+          await ctx.db.patch(prev._id, fields);
+        }
       } else {
         await ctx.db.insert("transcriptTurns", fields);
       }

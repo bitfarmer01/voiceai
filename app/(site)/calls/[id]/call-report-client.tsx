@@ -74,7 +74,12 @@ export function CallReportClient({ id }: { id: string }) {
   // visitor who owns it. We pass the persisted per-browser visitorKey that
   // startCall stored on the call row, so the owner sees their report while a third
   // party who opens the link (different visitorKey) gets null → "call not found".
-  const call = useQuery(api.calls.getById, { callId, visitorKey });
+  // Gate on a non-empty key ("skip" until useVisitorKey hydrates) so the owner
+  // doesn't see a one-frame "Call not found" flash before the real key loads.
+  const call = useQuery(
+    api.calls.getById,
+    visitorKey ? { callId, visitorKey } : "skip",
+  );
   const spans = useQuery(api.spans.listByTrace, { traceId: id });
   const turns = useQuery(api.transcriptTurns.listByCall, { callId });
   const rateMutation = useMutation(api.voiceRatings.rate);

@@ -171,4 +171,49 @@ describe("deriveSpansFromEvents", () => {
     expect(stt.startMs).toBe(200);
     expect(stt.endMs).toBe(500);
   });
+
+  test("single-final assistant transcript → tts span has a non-zero width (estimated)", () => {
+    // VAPI emits exactly one `final` for the assistant turn at ts=900, so
+    // minTs === maxTs and the raw window would be 0-width. We estimate the
+    // speaking duration from the assistant word count instead.
+    const events: VapiEvent[] = [
+      tx(200, "user", true, "what time do you close"),
+      tx(900, "assistant", true, "we are open from nine to five every day"), // 9 words, single final
+    ];
+    const spans = deriveSpansFromEvents(events, { traceId: TRACE, callStartMs: 0 });
+    const tts = spans.find((s) => s.kind === "tts")!;
+    expect(tts).toBeTruthy();
+    // 9 words / 150 wpm * 60000ms = 3600ms; well above the floor.
+    expect(tts.startMs).toBe(900);
+    expect(tts.durationMs).toBeGreaterThan(0);
+    expect(tts.durationMs).toBe(3600);
+    expect(tts.endMs).toBe(900 + 3600);
+  });
+
+  test("single-final one-word assistant reply → tts width respects the minimum floor", () => {
+    const events: VapiEvent[] = [
+      tx(200, "user", true, "are you open"),
+      tx(800, "assistant", true, "yes"), // 1 word → estimate below floor
+    ];
+    const spans = deriveSpansFromEvents(events, { traceId: TRACE, callStartMs: 0 });
+    const tts = spans.find((s) => s.kind === "tts")!;
+    // 1 word / 150 wpm ≈ 400ms estimate, clamped to the 400ms floor either way;
+    // the key assertion is that it is NOT zero-width.
+    expect(tts.durationMs).toBeGreaterThanOrEqual(400);
+  });
+
+  test("multi-final assistant turn keeps the real (non-estimated) tts window", () => {
+    // Two assistant finals → minTs !== maxTs, so the real timestamps are used
+    // and we do NOT substitute an estimate.
+    const events: VapiEvent[] = [
+      tx(100, "user", true, "hi"),
+      tx(600, "assistant", true, "hello there"),
+      tx(1400, "assistant", true, "how can I help"),
+    ];
+    const spans = deriveSpansFromEvents(events, { traceId: TRACE, callStartMs: 0 });
+    const tts = spans.find((s) => s.kind === "tts")!;
+    expect(tts.startMs).toBe(600);
+    expect(tts.endMs).toBe(1400); // real last-final ts, not an estimate
+    expect(tts.durationMs).toBe(800);
+  });
 });

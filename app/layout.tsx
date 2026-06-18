@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Space_Grotesk, Hanken_Grotesk, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/providers";
@@ -24,6 +24,15 @@ export const metadata: Metadata = {
   title: "Receptionist · Voice AI",
   description:
     "Talk to a document-grounded AI voice receptionist — live in the browser, no signup. Built with production observability, provider benchmarking, evals, and a hard budget guard.",
+};
+
+// Signal Bold brand tokens: ink #121210 (dark bg) / paper #F4F4EE (light bg)
+export const viewport: Viewport = {
+  colorScheme: "light dark",
+  themeColor: [
+    { media: "(prefers-color-scheme: dark)", color: "#121210" },
+    { media: "(prefers-color-scheme: light)", color: "#F4F4EE" },
+  ],
 };
 
 export default function RootLayout({

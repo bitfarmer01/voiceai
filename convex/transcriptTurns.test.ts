@@ -87,6 +87,52 @@ test("recordTurns drops silently for an unknown call", async () => {
   expect(turns).toHaveLength(0);
 });
 
+test("recordTurns skips patch when re-flush sends identical turns (idempotent no-op)", async () => {
+  const t = convexTest(schema, modules);
+  const callId = await makeCall(t);
+
+  const turns = [
+    { idx: 0, role: "user" as const, text: "hi there", ts: 1100 },
+    { idx: 1, role: "assistant" as const, text: "hello!", ts: 1400 },
+  ];
+
+  // First flush — inserts both rows.
+  await t.mutation(api.transcriptTurns.recordTurns, { callId, sessionId: "sess-1", turns });
+
+  // Second flush with identical content — should be a no-op.
+  await t.mutation(api.transcriptTurns.recordTurns, { callId, sessionId: "sess-1", turns });
+
+  const stored = await t.query(api.transcriptTurns.listByCall, { callId });
+  // Data is preserved correctly — still exactly 2 turns, same content.
+  expect(stored).toHaveLength(2);
+  expect(stored[0].text).toBe("hi there");
+  expect(stored[1].text).toBe("hello!");
+  expect(stored[0].interim).toBe(false);
+});
+
+test("recordTurns still patches when a field changes on re-flush", async () => {
+  const t = convexTest(schema, modules);
+  const callId = await makeCall(t);
+
+  // First flush — interim / incomplete text.
+  await t.mutation(api.transcriptTurns.recordTurns, {
+    callId,
+    sessionId: "sess-1",
+    turns: [{ idx: 0, role: "user" as const, text: "what are your", ts: 1100 }],
+  });
+
+  // Second flush — text corrected (turn is now finalized).
+  await t.mutation(api.transcriptTurns.recordTurns, {
+    callId,
+    sessionId: "sess-1",
+    turns: [{ idx: 0, role: "user" as const, text: "what are your hours", ts: 1100 }],
+  });
+
+  const stored = await t.query(api.transcriptTurns.listByCall, { callId });
+  expect(stored).toHaveLength(1);
+  expect(stored[0].text).toBe("what are your hours");
+});
+
 test("recordTurns rejects a caller whose sessionId does not own the call", async () => {
   const t = convexTest(schema, modules);
   const callId = await makeCall(t); // sessionId "sess-1"
