@@ -1,15 +1,23 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Space_Grotesk, Hanken_Grotesk, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/providers";
 import { Toaster } from "@/components/ui/sonner";
 import { cn } from "@/lib/utils";
 
-const geist = Geist({subsets:['latin'],variable:'--font-sans'});
+// Signal Bold identity: Space Grotesk (display) · Hanken Grotesk (body) · IBM Plex Mono (data)
+const sans = Hanken_Grotesk({ subsets: ["latin"], variable: "--font-sans" });
 
-const geistMono = Geist_Mono({
+const display = Space_Grotesk({
+  subsets: ["latin"],
+  variable: "--font-heading",
+  weight: ["400", "500", "600", "700"],
+});
+
+const mono = IBM_Plex_Mono({
   variable: "--font-mono",
   subsets: ["latin"],
+  weight: ["400", "500"],
 });
 
 export const metadata: Metadata = {
@@ -27,7 +35,7 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={cn("h-full", "antialiased", geistMono.variable, "font-sans", geist.variable)}
+      className={cn("h-full", "antialiased", sans.variable, display.variable, mono.variable, "font-sans")}
     >
       <body className="min-h-full flex flex-col">
         <Providers>

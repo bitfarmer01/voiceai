@@ -14,6 +14,7 @@ import { Activity, Clock, DollarSign, Phone, TrendingUp } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import { formatUsd, formatMs } from "@/lib/format";
 import { BudgetMeter } from "@/components/shared/budget-meter";
+import { DemoDataBadge } from "@/components/shared/demo-data-badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useBudgetState, useRecentCalls } from "@/lib/data";
 import type { CallSummary } from "@/lib/types";
@@ -79,7 +80,10 @@ export default function AnalyticsPage() {
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold">Analytics</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-2xl font-bold">Analytics</h1>
+          <DemoDataBadge />
+        </div>
         <p className="mt-1 text-sm text-muted-foreground">
           Aggregated from the last {calls.length} calls
         </p>

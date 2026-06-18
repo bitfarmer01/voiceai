@@ -24,12 +24,25 @@ export const list = query({
   args: { kind: v.optional(providerKind) },
   returns: v.array(providerStatValidator),
   handler: async (ctx, args) => {
-    if (args.kind) {
-      return await ctx.db
-        .query("providerStats")
-        .withIndex("by_kind", (q) => q.eq("kind", args.kind!))
-        .collect();
-    }
-    return await ctx.db.query("providerStats").collect();
+    const rows = args.kind
+      ? await ctx.db
+          .query("providerStats")
+          .withIndex("by_kind", (q) => q.eq("kind", args.kind!))
+          .collect()
+      : await ctx.db.query("providerStats").collect();
+    // Map to the clean ProviderStat shape — raw docs carry _id/_creationTime,
+    // which the returns validator (rightly) rejects.
+    return rows.map((r) => ({
+      provider: r.provider,
+      kind: r.kind,
+      source: r.source,
+      voice: r.voice,
+      p50LatencyMs: r.p50LatencyMs,
+      p95LatencyMs: r.p95LatencyMs,
+      costPerMin: r.costPerMin,
+      avgRating: r.avgRating,
+      callCount: r.callCount,
+      languages: r.languages,
+    }));
   },
 });

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Mic, MicOff, PhoneOff, Phone, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,7 @@ export function CallController({
   secondsLeft,
   muted,
   disabled,
+  reportHref,
   onTalk,
   onEnd,
   onToggleMute,
@@ -26,6 +28,8 @@ export function CallController({
   secondsLeft: number;
   muted: boolean;
   disabled?: boolean;
+  /** Post-call report link; when present it becomes the primary next action. */
+  reportHref?: string;
   onTalk: () => void;
   onEnd: () => void;
   onToggleMute: () => void;
@@ -39,6 +43,7 @@ export function CallController({
     <div className="flex flex-col items-center gap-4">
       <CallStatusBadge status={status} />
 
+      {status !== "ended" && (
       <div className="flex items-center gap-4">
         {active && (
           <Button
@@ -99,12 +104,29 @@ export function CallController({
           </span>
         )}
       </div>
+      )}
 
       {status === "idle" && <p className="text-xs text-muted-foreground">Talk · 120-second demo · mic asked once</p>}
+
       {status === "ended" && (
-        <Button variant="link" size="sm" onClick={onTalk}>
-          Start another call
-        </Button>
+        // One primary next action (the report — this demo's payoff) plus a quiet
+        // restart. Avoids the old duplicate-intent stack (a round restart button
+        // AND a "Start another call" link AND a separate report link).
+        <div className="flex w-full max-w-64 flex-col items-center gap-2">
+          {reportHref && (
+            <Button asChild className="w-full">
+              <Link href={reportHref}>View post-call report</Link>
+            </Button>
+          )}
+          <Button
+            variant={reportHref ? "ghost" : "default"}
+            size={reportHref ? "sm" : "default"}
+            className={reportHref ? undefined : "w-full"}
+            onClick={onTalk}
+          >
+            Start another call
+          </Button>
+        </div>
       )}
     </div>
   );

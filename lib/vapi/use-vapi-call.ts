@@ -129,6 +129,9 @@ export function useVapiCall(): VapiCall {
   const callIdRef = React.useRef<Id<"calls"> | null>(null);
   const sessionIdRef = React.useRef<string | null>(null);
   const flushTimerRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
+  // Ensures the final flush (spans + turns + metrics) runs exactly once, whether
+  // it's triggered by the End button (stop) or the SDK's "call-end" event.
+  const finalFlushedRef = React.useRef(false);
 
   const batchWriteSpans = useMutation(api.telemetry.batchWriteSpans);
   const recordTurns = useMutation(api.transcriptTurns.recordTurns);
@@ -195,6 +198,13 @@ export function useVapiCall(): VapiCall {
     [batchWriteSpans, recordTurns, recordQualityMetrics],
   );
 
+  /** Persist the final trace + metrics, guarded so it fires at most once per call. */
+  const runFinalFlush = React.useCallback(() => {
+    if (finalFlushedRef.current) return;
+    finalFlushedRef.current = true;
+    void flush(true);
+  }, [flush]);
+
   const startTimer = React.useCallback(() => {
     stopTimer();
     cappedRef.current = false;
@@ -238,8 +248,9 @@ export function useVapiCall(): VapiCall {
       setVolume(0);
       stopTimer();
       stopFlushTimer();
-      // Final flush: spans + finalized turns + quality metrics.
-      void flush(true);
+      // Final flush: spans + finalized turns + quality metrics (no-op if End
+      // already triggered it).
+      runFinalFlush();
     };
     const onSpeechStart = () => setAgentSpeaking(true);
     const onSpeechEnd = () => setAgentSpeaking(false);
@@ -286,7 +297,7 @@ export function useVapiCall(): VapiCall {
       stopTimer();
       stopFlushTimer();
     };
-  }, [startTimer, stopTimer, stopFlushTimer, flush]);
+  }, [startTimer, stopTimer, stopFlushTimer, flush, runFinalFlush]);
 
   const start = React.useCallback(
     async (assistant: unknown, callId: string, sessionId: string): Promise<string | null> => {
@@ -300,6 +311,7 @@ export function useVapiCall(): VapiCall {
       eventsRef.current = [];
       turnsRef.current = [];
       callStartRef.current = null;
+      finalFlushedRef.current = false;
       callIdRef.current = callId as Id<"calls">;
       sessionIdRef.current = sessionId;
       setStatus("connecting");
@@ -316,12 +328,23 @@ export function useVapiCall(): VapiCall {
   );
 
   const stop = React.useCallback(() => {
+    // Optimistic teardown: flip the UI to "ended" immediately rather than waiting
+    // on the SDK's "call-end" event, which can be delayed, dropped, or throw —
+    // leaving the End button looking dead. The later "call-end" just reaffirms this.
+    setStatus((s) => (s === "live" || s === "connecting" ? "ended" : s));
+    setAgentSpeaking(false);
+    setVolume(0);
+    stopTimer();
+    stopFlushTimer();
+    // Persist the final trace + metrics now, so they land even if "call-end" never fires.
+    runFinalFlush();
     try {
       getVapi().stop();
     } catch {
-      /* noop */
+      // Don't swallow teardown failures silently — surface so they're detectable.
+      setError("Couldn't cleanly end the call — it may take a moment to disconnect.");
     }
-  }, []);
+  }, [stopTimer, stopFlushTimer, runFinalFlush]);
 
   const toggleMute = React.useCallback(() => {
     const vapi = getVapi();
@@ -341,6 +364,7 @@ export function useVapiCall(): VapiCall {
     callStartRef.current = null;
     callIdRef.current = null;
     sessionIdRef.current = null;
+    finalFlushedRef.current = false;
   }, []);
 
   return { status, turns, volume, agentSpeaking, muted, error, secondsLeft, start, stop, toggleMute, reset };

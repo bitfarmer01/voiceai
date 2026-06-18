@@ -3,10 +3,12 @@
 import * as React from "react";
 import Link from "next/link";
 import { useQuery, useMutation } from "convex/react";
-import { ArrowLeft, Calendar, Download } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { formatUsd, formatDuration, formatMs } from "@/lib/format";
+import { bookingFromStructuredData } from "@/lib/calls/booking";
+import { AppointmentCard } from "@/components/shared/appointment-card";
 import { TraceWaterfall } from "@/components/shared/trace-waterfall";
 import type { WaterfallTurn } from "@/components/shared/trace-waterfall";
 import { CostBreakdown } from "@/components/shared/cost-breakdown";
@@ -16,7 +18,6 @@ import { StarRating } from "@/components/shared/star-rating";
 import { EmptyState } from "@/components/states/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { useVisitorKey } from "@/lib/hooks/use-visitor-key";
 import type { SpanKind, TranscriptTurn } from "@/lib/types";
 
@@ -140,12 +141,7 @@ export function CallReportClient({ id }: { id: string }) {
     text: t.text,
     ts: t.ts,
   }));
-  const booking =
-    c.structuredData &&
-    typeof c.structuredData === "object" &&
-    "booking" in (c.structuredData as Record<string, unknown>)
-      ? (c.structuredData as Record<string, unknown>).booking
-      : null;
+  const booking = bookingFromStructuredData(c.structuredData);
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6">
@@ -198,28 +194,7 @@ export function CallReportClient({ id }: { id: string }) {
           {/* Booking */}
           {booking != null && (
             <section className="rounded-xl border bg-card p-5">
-              <div className="mb-3 flex items-center gap-2">
-                <Calendar className="size-4 text-success" />
-                <h2 className="text-sm font-semibold">Booking captured</h2>
-              </div>
-              <pre className="overflow-auto rounded-lg bg-secondary p-3 font-mono text-xs text-foreground">
-                {JSON.stringify(booking, null, 2)}
-              </pre>
-              <Button
-                variant="link"
-                size="sm"
-                className="mt-3 h-auto gap-1.5 p-0 text-xs"
-                onClick={() => {
-                  const blob = new Blob([JSON.stringify(booking, null, 2)], { type: "application/json" });
-                  const a = document.createElement("a");
-                  a.href = URL.createObjectURL(blob);
-                  a.download = `booking-${id}.json`;
-                  a.click();
-                }}
-              >
-                <Download className="size-3.5" />
-                Download booking
-              </Button>
+              <AppointmentCard booking={booking} />
             </section>
           )}
 

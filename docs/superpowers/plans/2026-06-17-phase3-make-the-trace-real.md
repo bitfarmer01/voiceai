@@ -2,7 +2,7 @@
 
 Last updated: 2026-06-17
 Branch: `phase3-make-the-trace-real` (off `main`)
-Status: **complete — all 6 build steps + 5 adversarial-review fixes done; typecheck clean; 81 tests pass (was 55). Not yet committed.**
+Status: **complete — all 6 build steps + 5 adversarial-review fixes done; typecheck clean; 81 tests pass (was 55). Committed as `1e62781` (on `feature/byod-try-page` + `phase3-make-the-trace-real`); NOT yet merged to `main`.**
 
 ## Review fixes applied (adversarial pass)
 

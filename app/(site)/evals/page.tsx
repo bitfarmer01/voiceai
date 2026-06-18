@@ -1,6 +1,6 @@
 "use client";
 
-import { FlaskConical, TrendingDown } from "lucide-react";
+import { FlaskConical, Info, TrendingDown } from "lucide-react";
 import { EvalBadge } from "@/components/shared/status-badge";
 import {
   Table,
@@ -55,11 +55,22 @@ export default function EvalsPage() {
         </div>
       </div>
 
+      {/* This page is a non-functional preview: the numbers below are an illustrative
+          sample, not a live eval run. Make that unmistakable up front. */}
+      <div className="mb-6 flex items-start gap-3 rounded-xl border bg-secondary/40 px-4 py-3">
+        <Info className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+        <p className="text-sm text-pretty text-muted-foreground">
+          <span className="font-medium text-foreground">Sample data.</span> This page shows an
+          illustrative eval run, not live results — the eval harness isn&apos;t wired to a backend yet.
+        </p>
+      </div>
+
       {hasRegression && (
-        <div className="mb-6 flex items-start gap-3 rounded-xl border border-danger/30 bg-danger-subtle/20 px-4 py-3">
-          <TrendingDown className="mt-0.5 size-4 shrink-0 text-danger" />
-          <p className="text-sm text-danger">
-            <span className="font-medium">Regression detected.</span> Latest run failed against baseline.
+        <div className="mb-6 flex items-start gap-3 rounded-xl border bg-muted/40 px-4 py-3">
+          <TrendingDown className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+          <p className="text-sm text-pretty text-muted-foreground">
+            <span className="font-medium text-foreground">Regression detected (sample).</span> In a
+            live run, this banner flags when the latest run falls below baseline.
           </p>
         </div>
       )}

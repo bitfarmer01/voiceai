@@ -112,6 +112,19 @@ export interface ProviderStat {
   languages: string[];
 }
 
+// ── Booking (structured outcome of book_appointment) ────────────────────────────
+export interface Booking {
+  /** The `leads` row id — also the path segment for the .ics download. */
+  confirmationId: string;
+  /** ISO datetime or "HH:mm" wall-clock string of the chosen slot. */
+  slot: string;
+  customerName: string;
+  contact: string;
+  service?: string | null;
+  notes?: string | null;
+  bookedAt: number;
+}
+
 // ── Business profile (grounding) ────────────────────────────────────────────────
 export interface BusinessProfile {
   id: string;

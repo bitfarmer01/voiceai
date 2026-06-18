@@ -34,29 +34,16 @@ test("canStartCall: total_budget takes precedence over daily_budget", async () =
   expect(res.reason).toBe("total_budget");
 });
 
-test("canStartCall: visitor_cap blocks after 2 daily calls for the same visitor", async () => {
+test("canStartCall: per-visitor daily call cap is removed — a visitor with many calls is still allowed", async () => {
   const t = convexTest(schema, modules);
   await t.run(async (ctx) => {
     await ctx.db.insert("visitorUsage", {
       visitorKey: "v1",
       day: TODAY,
-      callsToday: 2,
+      callsToday: 50,
     });
   });
   const res = await t.query(api.guard.canStartCall, { visitorKey: "v1" });
-  expect(res).toEqual({ allowed: false, reason: "visitor_cap" });
-});
-
-test("canStartCall: visitor_cap is per-visitor — another visitor is still allowed", async () => {
-  const t = convexTest(schema, modules);
-  await t.run(async (ctx) => {
-    await ctx.db.insert("visitorUsage", {
-      visitorKey: "v1",
-      day: TODAY,
-      callsToday: 2,
-    });
-  });
-  const res = await t.query(api.guard.canStartCall, { visitorKey: "v2" });
   expect(res).toEqual({ allowed: true, reason: "ok" });
 });
 

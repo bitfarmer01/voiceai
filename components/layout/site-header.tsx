@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { AudioLines, Menu } from "lucide-react";
+import { Waveform, List } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 import { NAV_ITEMS } from "@/lib/nav";
 import { Button } from "@/components/ui/button";
@@ -39,7 +39,7 @@ export function SiteHeader() {
       <div className="mx-auto flex h-full max-w-7xl items-center justify-between gap-4 px-4 sm:px-6">
         <div className="flex items-center gap-6">
           <Link href="/" className="flex items-center gap-2 font-semibold tracking-tight">
-            <AudioLines className="size-5 text-primary" />
+            <Waveform weight="bold" className="size-5 text-primary" />
             <span>Receptionist</span>
           </Link>
           <nav className="hidden items-center gap-1 md:flex">
@@ -76,7 +76,7 @@ export function SiteHeader() {
           <Sheet open={open} onOpenChange={setOpen}>
             <SheetTrigger asChild>
               <Button variant="ghost" size="icon" className="size-8 md:hidden" aria-label="Open menu">
-                <Menu className="size-5" />
+                <List className="size-5" />
               </Button>
             </SheetTrigger>
             <SheetContent side="right" className="w-72">

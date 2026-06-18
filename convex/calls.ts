@@ -45,7 +45,6 @@ function startOfLocalDay(ms: number): number {
  */
 async function guardCheck(
   ctx: MutationCtx,
-  visitorKey: string,
   now: number,
 ): Promise<GuardReason> {
   const today = dayBucket(now);
@@ -55,17 +54,10 @@ async function guardCheck(
   const daySpent = budget && budget.day === today ? budget.daySpentUsd : 0;
   const activeCalls = budget?.activeCalls ?? 0;
 
-  const usage = await ctx.db
-    .query("visitorUsage")
-    .withIndex("by_visitor_day", (q) =>
-      q.eq("visitorKey", visitorKey).eq("day", today),
-    )
-    .unique();
-  const callsToday = usage?.callsToday ?? 0;
-
+  // The per-visitor daily call cap is removed for now — a running call is
+  // bounded instead by the per-call duration cutoff (BUDGET.MAX_CALL_SECONDS).
   if (totalSpent >= BUDGET.TOTAL_CAP) return "total_budget";
   if (daySpent >= BUDGET.DAY_CAP) return "daily_budget";
-  if (callsToday >= BUDGET.VISITOR_CALL_CAP) return "visitor_cap";
   if (activeCalls >= BUDGET.MAX_CONCURRENT) return "concurrency";
   return "ok";
 }
@@ -139,7 +131,7 @@ export const startCall = mutation({
 
     // Authoritative server-side guard. A blocked call throws — the client
     // should have called canStartCall() first and rendered the graceful state.
-    const reason = await guardCheck(ctx, args.visitorKey, now);
+    const reason = await guardCheck(ctx, now);
     if (reason !== "ok") {
       throw new Error(`call_blocked:${reason}`);
     }

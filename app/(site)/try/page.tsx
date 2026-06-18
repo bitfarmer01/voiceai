@@ -1,12 +1,13 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
 import { useMutation, useQuery, useAction } from "convex/react";
 import { CheckCircle2, FileText } from "lucide-react";
 import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
 import { cn } from "@/lib/utils";
 import { formatUsd } from "@/lib/format";
+import { bookingFromStructuredData } from "@/lib/calls/booking";
 import { PRESETS, getPreset } from "@/lib/data/presets";
 import { useBudgetState } from "@/lib/data";
 import { useVisitorKey } from "@/lib/hooks/use-visitor-key";
@@ -21,6 +22,7 @@ import { AgentStage } from "@/components/try/agent-stage";
 import { CallController } from "@/components/try/call-controller";
 import { PipelineSelector } from "@/components/try/pipeline-selector";
 import { CallTimeline } from "@/components/shared/call-timeline";
+import { AppointmentCard } from "@/components/shared/appointment-card";
 import { BudgetMeter } from "@/components/shared/budget-meter";
 import {
   ConsentDialog,
@@ -28,7 +30,6 @@ import {
   DemoBusyPanel,
   MicPermissionPanel,
   TotalBudgetPanel,
-  VisitorCapPanel,
 } from "@/components/states/guard-panels";
 import { EmptyState } from "@/components/states/empty-state";
 import { Badge } from "@/components/ui/badge";
@@ -40,19 +41,15 @@ const SITE_URL =
 const WEBHOOK_URL = SITE_URL ? `${SITE_URL}/vapi/webhook` : undefined;
 const PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY;
 
-function msUntilMidnight(): number {
-  const now = new Date();
-  const midnight = new Date(now);
-  midnight.setHours(24, 0, 0, 0);
-  return midnight.getTime() - now.getTime();
-}
-
 export default function TryPage() {
   const [presetId, setPresetId] = React.useState(PRESETS[0].id);
   const [pipeline, setPipeline] = React.useState<PipelineSelection>(DEFAULT_PIPELINE);
   const [consentOpen, setConsentOpen] = React.useState(false);
   const [startError, setStartError] = React.useState<string | null>(null);
   const [lastCallId, setLastCallId] = React.useState<string | null>(null);
+  // Drives a reactive subscription to the call record so a booking captured
+  // mid-call (book_appointment patches structuredData) surfaces inline at once.
+  const [trackedCallId, setTrackedCallId] = React.useState<string | null>(null);
   const consentedRef = React.useRef(false);
   const activeCallIdRef = React.useRef<string | null>(null);
   const [sessionId] = React.useState(() => crypto.randomUUID());
@@ -62,6 +59,11 @@ export default function TryPage() {
   const visitorKey = useVisitorKey();
   const businesses = useQuery(api.businesses.listPresets);
   const guard = useQuery(api.guard.canStartCall, visitorKey ? { visitorKey } : "skip");
+  const trackedCall = useQuery(
+    api.calls.getById,
+    trackedCallId ? { callId: trackedCallId as Id<"calls"> } : "skip",
+  );
+  const booking = bookingFromStructuredData(trackedCall?.structuredData);
 
   const [mode, setMode] = React.useState<"preset" | "custom">("preset");
   const [customSource, setCustomSource] = React.useState<"upload" | "paste" | "link" | "form">("upload");
@@ -77,7 +79,7 @@ export default function TryPage() {
   const generateFromFormA = useAction(api.sources.generateFromForm);
   const uploadedBizQ = useQuery(
     api.businesses.getWithChunks,
-    uploadState.status === "ready" ? { businessId: uploadState.businessId as any } : "skip",
+    uploadState.status === "ready" ? { businessId: uploadState.businessId as Id<"businesses"> } : "skip",
   );
 
   const preset = getPreset(presetId)!;
@@ -188,6 +190,7 @@ export default function TryPage() {
           llmProvider: pipeline.llmId,
         });
         activeCallIdRef.current = callId;
+      setTrackedCallId(callId);
         const assistant = buildAssistantFromConvexBusiness(uploadedBizQ, pipeline, {
           webhookUrl: WEBHOOK_URL,
           toolBaseUrl: SITE_URL || undefined,
@@ -220,6 +223,7 @@ export default function TryPage() {
         llmProvider: pipeline.llmId,
       });
       activeCallIdRef.current = callId;
+      setTrackedCallId(callId);
       const assistant = buildAssistant(preset, pipeline, {
         webhookUrl: WEBHOOK_URL,
         toolBaseUrl: SITE_URL || undefined,
@@ -251,13 +255,6 @@ export default function TryPage() {
     call,
     attachVapiIdM,
     endCallM,
-    customSource,
-    handlePasteText,
-    handleIngestUrl,
-    handleGenerateFromForm,
-    ingestTextA,
-    ingestUrlA,
-    generateFromFormA,
   ]);
 
   React.useEffect(() => {
@@ -267,7 +264,10 @@ export default function TryPage() {
   }, [call.status]);
 
   const handleTalk = () => {
-    if (call.status === "ended") call.reset();
+    if (call.status === "ended") {
+      call.reset();
+      setTrackedCallId(null);
+    }
     if (blocked || !ready) return;
     if (!consentedRef.current) {
       setConsentOpen(true);
@@ -289,8 +289,6 @@ export default function TryPage() {
         <span>
           est. <span className="text-foreground tabular-nums">{formatUsd(budget.totalSpentUsd)}</span> / {formatUsd(budget.totalCapUsd, 0)} today
         </span>
-        <span className="text-muted-foreground/40">·</span>
-        <span>{guard?.reason === "visitor_cap" ? "no calls left today" : "2 calls/visitor/day"}</span>
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[27%_46%_27%]">
@@ -426,7 +424,6 @@ export default function TryPage() {
           {blocked && (
             <div className="p-4">
               {guard?.reason === "concurrency" && <DemoBusyPanel slots={budget.maxConcurrent} />}
-              {guard?.reason === "visitor_cap" && <VisitorCapPanel resetsInMs={msUntilMidnight()} />}
               {guard?.reason === "daily_budget" && <DailyBudgetPanel />}
               {guard?.reason === "total_budget" && <TotalBudgetPanel />}
             </div>
@@ -443,6 +440,7 @@ export default function TryPage() {
               secondsLeft={call.secondsLeft}
               muted={call.muted}
               disabled={blocked || !ready}
+              reportHref={lastCallId ? `/calls/${lastCallId}` : undefined}
               onTalk={handleTalk}
               onEnd={call.stop}
               onToggleMute={call.toggleMute}
@@ -451,17 +449,12 @@ export default function TryPage() {
             {call.error && !micDenied && (
               <p className="mt-2 text-center text-xs text-danger">{call.error}</p>
             )}
-            {call.status === "ended" && lastCallId && (
-              <div className="mt-3 text-center">
-                <Link
-                  href={`/calls/${lastCallId}`}
-                  className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
-                >
-                  View post-call report →
-                </Link>
-              </div>
-            )}
           </div>
+          {booking && (
+            <div className="border-t p-5">
+              <AppointmentCard booking={booking} />
+            </div>
+          )}
           <div className="min-h-0 flex-1 border-t p-4">
             {call.turns.length === 0 ? (
               <EmptyState

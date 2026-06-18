@@ -39,22 +39,22 @@ test("startCall: inserts a call row and bumps activeCalls", async () => {
   expect(count).toBe(1);
 });
 
-test("startCall: throws call_blocked:visitor_cap after 2 calls for the same visitor", async () => {
+test("startCall: no per-visitor daily cap — the same visitor can start multiple calls", async () => {
   const t = convexTest(schema, modules);
   const businessId = await seedAndGetBusinessId(t);
 
   await startOne(t, businessId, "v1", "-a");
   await startOne(t, businessId, "v1", "-b");
-
-  await expect(startOne(t, businessId, "v1", "-c")).rejects.toThrow(
-    "call_blocked:visitor_cap",
-  );
+  // Pre-removal this third call threw call_blocked:visitor_cap; now it succeeds
+  // (still bounded only by the concurrency cap of 3).
+  const third = await startOne(t, businessId, "v1", "-c");
+  expect(third).toBeTruthy();
 
   const count = await t.query(api.calls.activeCount, {});
-  expect(count).toBe(2);
+  expect(count).toBe(3);
 });
 
-test("startCall: visitor cap is per-visitor — different visitors are independent", async () => {
+test("startCall: different visitors can each start calls", async () => {
   const t = convexTest(schema, modules);
   const businessId = await seedAndGetBusinessId(t);
 

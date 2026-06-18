@@ -199,7 +199,9 @@ export const BUDGET = {
   TOTAL_CAP: 40,
   /** Per-day spend cap in USD. */
   DAY_CAP: 8,
-  /** Calls per visitor per day. */
+  /** Calls per visitor per day. NOT currently enforced — the guard no longer
+   *  blocks on this; a running call is bounded by MAX_CALL_SECONDS instead.
+   *  Retained so the cap can be restored later. */
   VISITOR_CALL_CAP: 2,
   /** Live concurrent calls. */
   MAX_CONCURRENT: 3,

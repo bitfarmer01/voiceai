@@ -4,10 +4,14 @@
  * `canStartCall()` runs before EVERY call and blocks if ANY of:
  *   - total spend  ≥ BUDGET.TOTAL_CAP          → "total_budget"
  *   - day spend    ≥ BUDGET.DAY_CAP            → "daily_budget"
- *   - this visitor ≥ BUDGET.VISITOR_CALL_CAP   → "visitor_cap"
  *   - active calls ≥ BUDGET.MAX_CONCURRENT     → "concurrency"
  * The reason returned is the FIRST failing guard in that precedence order;
  * "ok" when all pass. `allowed === (reason === "ok")`.
+ *
+ * The per-visitor daily call cap is removed for now — a single call is bounded
+ * instead by the per-call duration cutoff (BUDGET.MAX_CALL_SECONDS), so a call
+ * auto-ends once it has used its allowance. "visitor_cap" is therefore never
+ * returned today; the literal is retained so the cap can be restored later.
  *
  * Pure read (query) — the authoritative re-check happens server-side inside
  * calls.startCall so a client that ignores this can't slip past the cap.
@@ -27,7 +31,7 @@ export const canStartCall = query({
     allowed: v.boolean(),
     reason: guardReasonValidator,
   }),
-  handler: async (ctx, args) => {
+  handler: async (ctx) => {
     const today = dayBucket(Date.now());
 
     const budget = await ctx.db.query("budgetState").first();
@@ -36,23 +40,13 @@ export const canStartCall = query({
     const daySpent = budget && budget.day === today ? budget.daySpentUsd : 0;
     const activeCalls = budget?.activeCalls ?? 0;
 
-    // Per-visitor usage for today (indexed lookup, never a .filter()).
-    const usage = await ctx.db
-      .query("visitorUsage")
-      .withIndex("by_visitor_day", (q) =>
-        q.eq("visitorKey", args.visitorKey).eq("day", today),
-      )
-      .unique();
-    const callsToday = usage?.callsToday ?? 0;
-
-    // First failing guard wins, in cap precedence: total → day → visitor → concurrency.
+    // First failing guard wins, in cap precedence: total → day → concurrency.
+    // (The per-visitor daily call cap is intentionally not enforced — see header.)
     let reason: GuardReason = "ok";
     if (totalSpent >= BUDGET.TOTAL_CAP) {
       reason = "total_budget";
     } else if (daySpent >= BUDGET.DAY_CAP) {
       reason = "daily_budget";
-    } else if (callsToday >= BUDGET.VISITOR_CALL_CAP) {
-      reason = "visitor_cap";
     } else if (activeCalls >= BUDGET.MAX_CONCURRENT) {
       reason = "concurrency";
     }
