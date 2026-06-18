@@ -14,10 +14,11 @@ import { Pulse, Clock, CurrencyDollar, Phone, TrendUp } from "@phosphor-icons/re
 import { api } from "@/convex/_generated/api";
 import { formatUsd, formatMs } from "@/lib/format";
 import { BudgetMeter } from "@/components/shared/budget-meter";
-import { DemoDataBadge } from "@/components/shared/demo-data-badge";
+import { BuilderViewBanner } from "@/components/shared/builder-view-banner";
+import { EmptyState } from "@/components/states/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useBudgetState, useRecentCalls } from "@/lib/data";
-import type { CallSummary } from "@/lib/types";
+import type { BudgetState, CallSummary } from "@/lib/types";
 
 function median(nums: number[]): number {
   if (!nums.length) return 0;
@@ -61,11 +62,65 @@ function KpiCard({
 }
 
 export default function AnalyticsPage() {
+  // `undefined` while the Convex query loads · `[]` once it returns with no calls.
   const calls = useRecentCalls();
   const budget = useBudgetState();
   const active = useQuery(api.calls.activeCount);
   const today = useQuery(api.calls.countToday);
 
+  // Direct undefined checks (not a derived `loading` flag) so TypeScript narrows
+  // calls/active/today to non-undefined inside the populated branch.
+  const loading = calls === undefined || active === undefined || today === undefined;
+
+  function renderBody() {
+    if (calls === undefined || active === undefined || today === undefined) {
+      return <AnalyticsSkeleton />;
+    }
+    if (calls.length === 0) {
+      return (
+        <EmptyState
+          title="No calls yet"
+          description="These fill in once real calls come through."
+          action={{ label: "Try it", href: "/try" }}
+        />
+      );
+    }
+    return (
+      <AnalyticsBody calls={calls} budget={budget} active={active} today={today} />
+    );
+  }
+
+  return (
+    <div className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6">
+      <BuilderViewBanner />
+
+      <div className="mb-8">
+        <h1 className="text-2xl font-bold text-balance">Analytics</h1>
+        <p className="mt-1 text-sm text-pretty text-muted-foreground">
+          {loading
+            ? "Loading your call data…"
+            : calls && calls.length > 0
+              ? `Aggregated from the last ${calls.length} calls`
+              : "Aggregated from your real calls."}
+        </p>
+      </div>
+
+      {renderBody()}
+    </div>
+  );
+}
+
+function AnalyticsBody({
+  calls,
+  budget,
+  active,
+  today,
+}: {
+  calls: CallSummary[];
+  budget: BudgetState;
+  active: number;
+  today: number;
+}) {
   const ended = calls.filter((c) => c.status === "ended");
   const successRate =
     ended.length > 0
@@ -75,54 +130,34 @@ export default function AnalyticsPage() {
   const avgCost = ended.length > 0 ? ended.reduce((s, c) => s + c.costUsd, 0) / ended.length : 0;
   const timeSeries = callsPerDay(calls);
 
-  const loading = active === undefined || today === undefined;
-
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6">
-      <div className="mb-8">
-        <div className="flex items-center gap-2">
-          <h1 className="text-2xl font-bold">Analytics</h1>
-          <DemoDataBadge />
-        </div>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Aggregated from the last {calls.length} calls
-        </p>
-      </div>
-
+    <>
       {/* KPI tiles */}
       <div className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-4">
-        {loading ? (
-          Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-28 rounded-xl" />
-          ))
-        ) : (
-          <>
-            <KpiCard
-              icon={Phone}
-              label="Active now"
-              value={String(active)}
-              sub={`${today} today`}
-            />
-            <KpiCard
-              icon={Clock}
-              label="p50 TTFW"
-              value={formatMs(p50Ttfw)}
-              sub="time to first word"
-            />
-            <KpiCard
-              icon={CurrencyDollar}
-              label="Avg cost"
-              value={formatUsd(avgCost, 3)}
-              sub="per call"
-            />
-            <KpiCard
-              icon={TrendUp}
-              label="Booking rate"
-              value={`${successRate}%`}
-              sub={`${ended.length} calls sampled`}
-            />
-          </>
-        )}
+        <KpiCard
+          icon={Phone}
+          label="Active now"
+          value={String(active)}
+          sub={`${today} today`}
+        />
+        <KpiCard
+          icon={Clock}
+          label="p50 TTFW"
+          value={formatMs(p50Ttfw)}
+          sub="time to first word"
+        />
+        <KpiCard
+          icon={CurrencyDollar}
+          label="Avg cost"
+          value={formatUsd(avgCost, 3)}
+          sub="per call"
+        />
+        <KpiCard
+          icon={TrendUp}
+          label="Booking rate"
+          value={`${successRate}%`}
+          sub={`${ended.length} calls sampled`}
+        />
       </div>
 
       {/* Time series */}
@@ -173,6 +208,20 @@ export default function AnalyticsPage() {
         </h2>
         <BudgetMeter budget={budget} />
       </section>
-    </div>
+    </>
+  );
+}
+
+function AnalyticsSkeleton() {
+  return (
+    <>
+      <div className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <Skeleton key={i} className="h-28 rounded-xl" />
+        ))}
+      </div>
+      <Skeleton className="mb-8 h-64 rounded-xl" />
+      <Skeleton className="h-40 rounded-xl" />
+    </>
   );
 }
