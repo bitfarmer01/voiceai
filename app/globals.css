@@ -240,14 +240,6 @@
   animation: ticker 36s linear infinite;
 }
 
-@keyframes orb-pulse {
-  0% { box-shadow: 0 0 28px 4px color-mix(in oklab, var(--primary) 18%, transparent); transform: scale(0.99); }
-  100% { box-shadow: 0 0 52px 14px color-mix(in oklab, var(--primary) 32%, transparent); transform: scale(1.02); }
-}
-.animate-orb {
-  animation: orb-pulse 4s ease-in-out infinite alternate;
-}
-
 @keyframes pulse-ring {
   0% { transform: scale(0.7); opacity: 0.6; }
   100% { transform: scale(2.4); opacity: 0; }
@@ -256,12 +248,7 @@
   animation: pulse-ring 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
 }
 
-@keyframes eq-bar {
-  0%, 100% { transform: scaleY(0.35); }
-  50% { transform: scaleY(1); }
-}
-
-/* prefers-reduced-motion: disable orb/waveform/pulses/shimmer/slides → instant */
+/* prefers-reduced-motion: disable visualizer/waveform/pulses/shimmer/slides → instant */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
