@@ -20,6 +20,7 @@ import type * as lib___fixtures___vapiEndOfCallReport from "../lib/__fixtures__/
 import type * as lib_ingest_helpers from "../lib/ingest_helpers.js";
 import type * as lib_vapiReport from "../lib/vapiReport.js";
 import type * as lifecycle from "../lifecycle.js";
+import type * as ownerStats from "../ownerStats.js";
 import type * as providerStats from "../providerStats.js";
 import type * as providers from "../providers.js";
 import type * as seed from "../seed.js";
@@ -50,6 +51,7 @@ declare const fullApi: ApiFromModules<{
   "lib/ingest_helpers": typeof lib_ingest_helpers;
   "lib/vapiReport": typeof lib_vapiReport;
   lifecycle: typeof lifecycle;
+  ownerStats: typeof ownerStats;
   providerStats: typeof providerStats;
   providers: typeof providers;
   seed: typeof seed;
