@@ -5,9 +5,12 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
-  VAPI Voice Receptionist — design system (ui-development-plan.md §2)
-  Calm-but-technical: slate neutrals + one restrained blue accent.
+  VAPI Voice Receptionist — Signal Bold design system (ui-development-plan.md §2)
+  Warm paper + ink near-monochrome with one amber accent (orange-600 / orange-500 dark).
+  Typefaces: Space Grotesk (heading) · Hanken Grotesk (body) · IBM Plex Mono (data).
   Semantic tokens only; light + dark parity (dark is tuned, not a naive invert).
+  Note: `destructive` (shadcn) and `danger` (Signal Bold) resolve to the same hex;
+  consolidation is deferred — do not merge this pass.
 */
 @theme inline {
   --color-background: var(--background);
@@ -211,6 +214,13 @@
     @apply font-sans;
   }
   /* Signal Bold: display type on headings */
+  /*
+   * INTENTIONAL EXCEPTION to AGENTS.md "NEVER modify letter-spacing" rule.
+   * This -0.02em tight tracking on h1–h4 IS the explicitly requested Signal Bold
+   * design decision (memory.md "Locked decisions" / ui-development-plan.md §2).
+   * Future refactor: scope this to a `.display` utility + visually verify before
+   * removing the global rule — do not rip it out without a full browser check.
+   */
   h1, h2, h3, h4 {
     font-family: var(--font-heading);
     letter-spacing: -0.02em;

@@ -32,11 +32,11 @@ export function SiteHeader() {
   return (
     <header
       className={cn(
-        "fixed inset-x-0 top-0 z-50 h-14 border-b backdrop-blur-md transition-colors",
+        "fixed inset-x-0 top-0 z-40 h-14 border-b backdrop-blur-md transition-colors",
         scrolled ? "border-border bg-background/85" : "border-transparent bg-background/60",
       )}
     >
-      <div className="mx-auto flex h-full max-w-7xl items-center justify-between gap-4 px-4 sm:px-6">
+      <div className="mx-auto flex h-full max-w-7xl items-center justify-between gap-4 px-4 pt-[env(safe-area-inset-top)] sm:px-6">
         <div className="flex items-center gap-6">
           <Link href="/" className="flex items-center gap-2 font-semibold tracking-tight">
             <Waveform weight="bold" className="size-5 text-primary" />
@@ -81,7 +81,7 @@ export function SiteHeader() {
             </SheetTrigger>
             <SheetContent side="right" className="w-72">
               <SheetTitle className="px-4 pt-4 text-sm font-semibold">Receptionist</SheetTitle>
-              <nav className="mt-2 flex flex-col gap-1 px-2">
+              <nav className="mt-2 flex flex-col gap-1 px-2 pb-[env(safe-area-inset-bottom)]">
                 {NAV_ITEMS.map((item) => (
                   <Link
                     key={item.href}
