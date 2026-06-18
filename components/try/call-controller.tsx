@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Mic, MicOff, PhoneOff, Phone, Loader2 } from "lucide-react";
+import { Microphone, MicrophoneSlash, PhoneSlash, Phone, CircleNotch } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { CallStatusBadge } from "@/components/shared/status-badge";
@@ -53,7 +53,7 @@ export function CallController({
             onClick={onToggleMute}
             aria-label={muted ? "Unmute" : "Mute"}
           >
-            {muted ? <MicOff className="size-4 text-danger" /> : <Mic className="size-4" />}
+            {muted ? <MicrophoneSlash className="size-4 text-danger" /> : <Microphone className="size-4" />}
           </Button>
         )}
 
@@ -83,7 +83,7 @@ export function CallController({
               onClick={onEnd}
               aria-label="End call"
             >
-              {status === "connecting" ? <Loader2 className="size-6 animate-spin" /> : <PhoneOff className="size-6" />}
+              {status === "connecting" ? <CircleNotch className="size-6 animate-spin" /> : <PhoneSlash className="size-6" />}
             </Button>
           ) : (
             <Button

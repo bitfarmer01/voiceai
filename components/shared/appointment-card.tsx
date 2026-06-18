@@ -1,5 +1,5 @@
 import * as React from "react";
-import { CalendarCheck, CalendarPlus } from "lucide-react";
+import { CalendarCheck, CalendarPlus } from "@phosphor-icons/react/dist/ssr";
 import { Button } from "@/components/ui/button";
 import { formatSlot } from "@/lib/calls/booking";
 import type { Booking } from "@/lib/types";

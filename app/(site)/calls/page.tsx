@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useQuery } from "convex/react";
-import { Clock, Phone } from "lucide-react";
+import { Clock, Phone } from "@phosphor-icons/react";
 import { api } from "@/convex/_generated/api";
 import { cn } from "@/lib/utils";
 import { formatUsd, formatDuration } from "@/lib/format";

@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Loader2 } from "lucide-react";
+import { CircleNotch } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { UploadState } from "./doc-uploader";
@@ -41,7 +41,7 @@ export function UrlInput({ onSubmit, state, disabled }: UrlInputProps) {
       <Button type="button" className="w-full" onClick={handleClick} disabled={isDisabled}>
         {isLoading ? (
           <>
-            <Loader2 className="size-4 animate-spin" />
+            <CircleNotch className="size-4 animate-spin" />
             Fetching…
           </>
         ) : (

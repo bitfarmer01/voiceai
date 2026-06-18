@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { Clock, Mic, MicOff, Trophy, Users, Wallet } from "lucide-react";
+import { Clock, Microphone, MicrophoneSlash, Trophy, Users, Wallet } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -116,7 +116,7 @@ export function MicPermissionPanel({ denied = false, onRequest }: { denied?: boo
     return (
       <GuardPanel
         tone="danger"
-        icon={MicOff}
+        icon={MicrophoneSlash}
         title="Microphone access is blocked"
         action={
           <Button variant="outline" size="sm" onClick={onRequest}>
@@ -131,7 +131,7 @@ export function MicPermissionPanel({ denied = false, onRequest }: { denied?: boo
   return (
     <GuardPanel
       tone="info"
-      icon={Mic}
+      icon={Microphone}
       title="Microphone needed"
       action={
         <Button size="sm" onClick={onRequest}>

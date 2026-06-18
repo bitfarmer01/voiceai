@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Upload, CheckCircle2, Loader2 } from "lucide-react";
+import { UploadSimple, CheckCircle, CircleNotch } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 
 export type UploadState =
@@ -70,20 +70,20 @@ export function DocUploader({ onIngest, state, disabled }: DocUploaderProps) {
       >
         {state.status === "ready" ? (
           <>
-            <CheckCircle2 className="size-6 text-primary" />
+            <CheckCircle className="size-6 text-primary" />
             <span className="text-sm font-medium text-foreground">{state.fileName}</span>
             <span className="text-xs text-muted-foreground">Ready — click to replace</span>
           </>
         ) : isLoading ? (
           <>
-            <Loader2 className="size-6 animate-spin text-muted-foreground" />
+            <CircleNotch className="size-6 animate-spin text-muted-foreground" />
             <span className="text-sm text-muted-foreground">
               {state.status === "uploading" ? "Uploading…" : "Analyzing with AI…"}
             </span>
           </>
         ) : (
           <>
-            <Upload className="size-6 text-muted-foreground" />
+            <UploadSimple className="size-6 text-muted-foreground" />
             <span className="text-sm font-medium">Drop a doc or click to browse</span>
             <span className="text-xs text-muted-foreground">PDF · DOCX · TXT · PNG · JPG · max 5 MB</span>
           </>

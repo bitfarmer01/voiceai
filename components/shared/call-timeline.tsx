@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { ArrowDown } from "lucide-react";
+import { ArrowDown } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import type { TranscriptTurn } from "@/lib/types";

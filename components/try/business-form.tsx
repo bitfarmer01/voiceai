@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Loader2 } from "lucide-react";
+import { CircleNotch } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -80,7 +80,7 @@ export function BusinessForm({ onSubmit, state, disabled }: BusinessFormProps) {
         <Button type="submit" className="w-full" disabled={isDisabled}>
           {isLoading ? (
             <>
-              <Loader2 className="size-4 animate-spin" />
+              <CircleNotch className="size-4 animate-spin" />
               Generating…
             </>
           ) : (

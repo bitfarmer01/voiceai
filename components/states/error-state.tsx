@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, RotateCw } from "lucide-react";
+import { Warning, ArrowClockwise } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
@@ -32,7 +32,7 @@ export function ErrorState({
         className,
       )}
     >
-      <AlertTriangle className="size-6 text-danger" />
+      <Warning className="size-6 text-danger" />
       <h3 className="mt-3 text-sm font-semibold">{title}</h3>
       <p className="mt-1 max-w-sm text-sm text-muted-foreground">{description}</p>
       {retries >= 2 && (
@@ -40,7 +40,7 @@ export function ErrorState({
       )}
       {onRetry && (
         <Button variant="outline" size="sm" className="mt-4 gap-1.5" onClick={onRetry}>
-          <RotateCw className="size-3.5" />
+          <ArrowClockwise className="size-3.5" />
           Retry
         </Button>
       )}

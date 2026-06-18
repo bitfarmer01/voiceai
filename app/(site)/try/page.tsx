@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useMutation, useQuery, useAction } from "convex/react";
-import { CheckCircle2, FileText } from "lucide-react";
+import { CheckCircle, FileText } from "@phosphor-icons/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { cn } from "@/lib/utils";
@@ -363,7 +363,7 @@ export default function TryPage() {
                         {p.services.slice(0, 3).join(" · ")}
                       </p>
                     </div>
-                    {presetId === p.id && <CheckCircle2 className="ml-auto size-4 text-primary" />}
+                    {presetId === p.id && <CheckCircle className="ml-auto size-4 text-primary" />}
                   </button>
                 ))}
               </div>
