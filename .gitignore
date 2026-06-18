@@ -37,3 +37,6 @@ yarn-debug.log*
 
 # local claude settings
 .claude/settings.local.json
+
+# abandoned agent worktrees
+.claude/worktrees/
