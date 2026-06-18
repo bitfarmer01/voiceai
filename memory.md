@@ -1,6 +1,6 @@
 # Memory — Signal Bold UI + BYOD/appointment + Phase 3 telemetry
 
-Last updated: 2026-06-18 (code-review remediation — 23 findings fixed) · Branch: `feature/byod-try-page`
+Last updated: 2026-06-18 (owner-first repositioning — APPROVED PLAN, awaiting go-ahead) · Branch: `feature/byod-try-page`
 
 > ⚠️ **Two gotchas that bite first:**
 > 1. **Committed vs uncommitted on this branch.** Already committed (ahead of `main`): Phase 3 telemetry
@@ -11,6 +11,128 @@ Last updated: 2026-06-18 (code-review remediation — 23 findings fixed) · Bran
 > 2. **Convex dev deployment is AHEAD of `main`** (main lacks Phase 3 telemetry, commit `1e62781`).
 >    Deploying main or a pre-Phase-3 branch to it reintroduces `ArgumentValidationError` on
 >    `telemetry.batchWriteSpans`. Keep `convex dev` running; whatever merges MUST include `1e62781`.
+
+## Owner-first repositioning — BUILT + LIVE-VERIFIED via parallel subagents (2026-06-18, uncommitted)
+
+Big strategic pivot, now EXECUTED. The app was framed end-to-end as a developer/eval lab; it is now
+repositioned so a **non-technical small-business owner** is the default audience everywhere, with the
+eval/credibility showcase preserved behind one **"Behind the scenes"** toggle. Driven via `/architect`
+(deep rebuild, owner-only-by-default + toggle, REAL DATA ONLY) then built as a 2-wave **Workflow** of
+7 file-disjoint subagents (Stream A + F1/F2 foundation → B/C/D/E owner rebuild) + my integration.
+
+**What actually shipped (diverges from the earlier unexecuted `i-like-this-make-wild-feigenbaum.md` plan —
+NO `/try` stage-machine was built; instead a lighter gate + a NEW `/overview` screen):**
+- **View-mode spine** — `lib/view-mode.tsx` (NEW): `ViewModeProvider` + `useViewMode(){mode,setMode,toggle}`
+  + `<TechnicalOnly>`. Default `"owner"`, persisted to localStorage `"receptionist:view-mode"`. **Uses
+  `useSyncExternalStore`** (my integration upgrade — lint-clean, cross-tab sync, SSR snapshot = owner so no
+  hydration mismatch). `lib/nav.ts` split → `OWNER_NAV` (Try it · Calls · Overview) / `TECHNICAL_NAV`
+  (Leaderboard · Evals · Analytics). Toggle = `components/layout/view-mode-toggle.tsx` (Phosphor Wrench,
+  aria-pressed), in header next to ThemeToggle + in the mobile Sheet. Provider wraps the **(site) subtree
+  only** in `app/(site)/layout.tsx` → `/admin` has no provider (don't use the hooks there).
+- **Owner Overview (NEW)** — `app/(site)/overview/page.tsx` + `components/owner/{owner-stat-card,recent-activity-list}.tsx`
+  driven by NEW Convex query `api.ownerStats.summary` (`convex/ownerStats.ts`, indexed `by_status` eq "ended",
+  honest counts only). KPIs: **Calls answered / Appointments booked / Messages taken** + recent activity.
+  Honest empty state when 0; skeleton while loading. Omitted (can't be honestly derived): after-hours,
+  missed/unanswered, revenue; "messages taken" = engaged-but-not-booked (the only `leads` writer is
+  `book_appointment` which always also books, so a separate lead count would double-count).
+- **`/calls` + report reframed (Stream C)** — rows as "Booked an appointment / Took a message / Answered a
+  question" (off the real `outcome` from `listRecentAnonymized`); report leads with booking+summary; trace
+  waterfall + cost + quality wrapped in `<TechnicalOnly>` under a "Behind the scenes" heading. Header is
+  honest "Recent calls" (NOT "your calls" — it's the shared anonymized feed).
+- **Behind-the-scenes framing (Stream D)** — `components/shared/builder-view-banner.tsx` (NEW) atop
+  leaderboard/evals/analytics; all real-data-only with skeleton(undefined)/empty([]) states; `/evals` STUB
+  data fully gutted → honest empty state (NO `convex/evals.ts` query exists yet — flagged).
+- **Owner `/try` + copy (Stream E)** — the `<PipelineSelector/>` ("Voice pipeline") is wrapped in
+  `<TechnicalOnly>`; owners never see provider chrome and the call still starts on `DEFAULT_PIPELINE`.
+  Plain-language sweep: guardrail chips → "Answers only from your info / Won't make things up / Stays on your
+  business / Stays polite"; "Budget guard"→"Spending", "Live trace"→"This call"; landing technical link
+  softened ("Curious how it stacks up? Take a look under the hood"); `app/layout.tsx` metadata de-jargoned.
+- **All fabricated data removed (REAL ONLY)** — `convex/seed.ts` no longer seeds fake calls/providerStats/
+  budget (presets kept); `lib/data/index.ts` dropped MOCK fallbacks → `useRecentCalls()`/`useProviderStats()`
+  now return `T[] | undefined` (undefined=loading, []=empty); deleted `MOCK_RECENT_CALLS`/`MOCK_PROVIDER_STATS`
+  and the orphaned `components/shared/demo-data-badge.tsx` (`git rm`).
+
+**Verified (evidence):** `pnpm typecheck` 0 errors · **169/169 tests** · lint = baseline + exactly **1 new**
+error (`recent-activity-list.tsx:49`, the same relative-time-after-mount idiom already accepted in
+`use-visitor-key.ts:14`; `useSyncExternalStore` can't cache live time). Live Playwright smoke on
+localhost:3000: owner nav (Try it/Calls/Overview) → toggle reveals Leaderboard/Evals/Analytics; `/overview`
+renders real data light+dark; `/try` hides the picker in owner mode, shows it in technical; **0 console
+errors / 0 hydration warnings**.
+
+> ✅ **DATA CLEANUP DONE:** re-ran `pnpm convex run seed:seed` (user-authorized) — purged the 3 fabricated
+> seed calls + 8 fake providerStats from the live dev DB. Verified: `/overview` and `/calls` now render the
+> honest **"No calls yet"** empty states (light+dark). DB holds presets + a zeroed budget only; everything
+> shown is real. NOTE the seed stays destructive (clear-then-insert) — re-running it wipes any real calls.
+
+**Minor follow-ups left:** `components/layout/site-footer.tsx` still says "Recent Calls"/"Anonymous demo"
+(not in any stream's scope — align to "Calls"/soften "demo"); no `convex/evals.ts` query (evals = honest
+empty state until one exists); pipeline-selector internal labels stay technical (only shown behind the toggle).
+
+<details><summary>Earlier UNEXECUTED plan (historical)</summary>
+
+The prior section here described `~/.claude/plans/i-like-this-make-wild-feigenbaum.md` — a heavier `/try`
+guided stage-machine (`components/try/stages/*`), `use-advanced-mode.tsx`, owner nav = `Try it`+`Recent calls`.
+That plan was NEVER approved/executed; the build above supersedes it (different toggle file/name, no stage
+machine, added `/overview`). The `try-redesign-preview.html` mockup under `.superpowers/brainstorm/` is stale.
+</details>
+
+**Locked decisions (user-confirmed via AskUserQuestion):**
+- **`/try` = guided journey:** demo-intro → call **Glow Dental** (default demo preset, `lib/data/presets.ts`)
+  → demo-recap → "Add my business" (website-first onboarding) → call YOUR receptionist → recap. Plain
+  language, no jargon. Decompose into `components/try/stages/*` (DemoIntro, CallStage shared, Recap shared,
+  Onboarding, YourIntro) so `app/(site)/try/page.tsx` becomes a thin `Stage` machine.
+- **Advanced = ONE global toggle** (NOT per-surface, NOT a separate /lab area). New
+  `lib/hooks/use-advanced-mode.tsx` context+hook: OFF by default, persisted in `localStorage` + readable from
+  `?advanced=1`, auto-forces ON when on a lab route. ON reveals: lab nav links, the `/try` lab panels
+  (pipeline/trace/guardrails/budget → new `components/try/advanced-panels.tsx`), the report's technical tier,
+  and the header budget pill.
+- **Owner nav = `Try it` + `Recent calls`** only (+ "Talk to a receptionist" CTA). Split `lib/nav.ts` into
+  `OWNER_NAV` / `LAB_NAV`; `site-header.tsx` shows LAB_NAV only when advanced.
+- **Backend untouched** — pure presentation/IA/copy reframe. Reuse as-is: `useVapiCall`, assistant builders,
+  all Convex ingestion (`sources.ts`/`ingest.ts`/`businesses.ts`), `bookingFromStructuredData`/`AppointmentCard`,
+  guard/budget, and every existing `components/try/*` + shared component. Brand stays Signal Bold.
+
+**Phases in the plan:** Foundation (use-advanced-mode) → P1 `/try` stage machine → P2 nav/IA + header toggle →
+P3 report split (`call-report-client.tsx` left=owner / right=advanced) + `/calls` feed (hide provider row) →
+P4 copy/landing/metadata + jargon sweep + honesty (move always-green guardrail chips to Advanced — resolves
+the standing honesty flag; do NOT repaint `cost-breakdown.tsx`, its neutral grays are correct).
+
+**Verification target:** `pnpm typecheck`/`test`/`lint` (no new errors), live `/try` smoke test on localhost
+(full journey + verbal hang-up), Advanced ON/OFF across all surfaces + `?advanced=1` deep-link + localStorage
+persistence, Playwright light+dark screenshots. Keep `convex dev` running (dev deploy must stay on Phase-3
+telemetry commit `1e62781`).
+
+**Supersedes the old "Craft sweep" / "UI completion" next-steps** below as the authoritative direction — those
+remain for detail (lucide→Phosphor, depth unification, copy) and fold into P4. The `/leaderboard` redesign
+already done this session-range still stands.
+
+## End-call fix — dead button + mispositioned rings + verbal hang-up (2026-06-18, uncommitted)
+
+User reported the `/try` end-call surface still broken (built+typechecked before, **never run live**).
+Diagnosed via `/recover` as Failure Mode 1 (specific isolated bugs), root causes confirmed by reading
+files + the VAPI SDK types. **Three surgical fixes** (`pnpm typecheck` 0 errors · 169/169 tests):
+- **Dead End button** — the live countdown ring `<svg>` in `call-controller.tsx:62` paints on top of
+  the End button (positioned vs in-flow) with **no `pointer-events-none`**, swallowing the click.
+  `useVapiCall.stop()` was correct, just never called. Fix: added `pointer-events-none`.
+- **Off-center countdown ring** (same SVG) — `92px` over a `64px` (`size-16`) button at `-inset-1.5`
+  (−6px) is over-constrained (`-6+92-6=80≠64`) → ~8px down-right. Fix: `-inset-3.5` (−14px → `=64`,
+  concentric, transform-free so `-rotate-90` is untouched).
+- **Connecting pulse-ring** mispositioned (`agent-stage.tsx:50`) — `absolute size-32` with no offsets
+  → pins top-left. Fix: `inset-0 m-auto` (auto-margin centering, NOT a transform — the `pulse-ring`
+  keyframe owns `transform: scale()`). Added `pointer-events-none` to both rings.
+- **No verbal hang-up** (`lib/vapi/assistant.ts`) — assistant had no `endCall` tool / `endCallPhrases`
+  / prompt instruction, so the LLM literally couldn't end the call. Layered fix: `END_CALL_TOOL =
+  { type: "endCall" }` always appended to model tools (both `buildAssistant` +
+  `buildAssistantFromConvexBusiness`; `fnTools` now `[]` not `undefined`); one system-prompt line
+  telling it to farewell+hang up on caller request; `endCallPhrases` backstop (conservative:
+  goodbye / have a great day / talk to you later). Verified shapes vs `@vapi-ai/web@2.5.2`
+  (`CreateEndCallToolDTO` = `{type:"endCall"}`, top-level `endCallPhrases?: string[]`).
+
+**LIVE `/try` SMOKE TEST PASSED (user-confirmed, 2026-06-18):** clicking End now ends the call (button
+no longer dead), the rings render correctly, and the call ends on a verbal request. The `pointer-events-none`
+overlay theory for the dead button was **confirmed correct** — no teardown re-diagnosis needed. This also
+clears the long-standing "verify the `ended` state on a live call" / "never rendered" flag elsewhere in
+this file. Plan: `~/.claude/plans/the-end-call-functionality-transient-parrot.md`. **Still uncommitted.**
 
 ## Code-review remediation — Next.js best-practices pass (2026-06-18, uncommitted)
 
