@@ -25,8 +25,8 @@ export default function EvalsPage() {
       <section className="rounded-xl border bg-card">
         <EmptyState
           icon={Flask}
-          title="No eval runs yet"
-          description="Run history and scores appear here once the eval harness runs against real calls."
+          title="Eval harness isn't wired up yet"
+          description="This build doesn't run the scripted eval scenarios yet. Once it does, their grounding and task-success scores — and any regressions between config changes — will show here."
           action={{ label: "Try it", href: "/try" }}
         />
       </section>
