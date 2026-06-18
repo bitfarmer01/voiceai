@@ -46,7 +46,7 @@ export function UrlInput({ onSubmit, state, disabled }: UrlInputProps) {
             Fetching…
           </>
         ) : (
-          "Fetch site"
+          "Use this site"
         )}
       </Button>
     </form>

@@ -81,10 +81,10 @@ export function BusinessForm({ onSubmit, state, disabled }: BusinessFormProps) {
           {isLoading ? (
             <>
               <CircleNotch className="size-4 animate-spin" />
-              Generating…
+              Setting up…
             </>
           ) : (
-            "Generate guidelines"
+            "Set up my receptionist"
           )}
         </Button>
       </div>

@@ -65,7 +65,7 @@ export function BudgetMeter({
     <div className={cn("space-y-3", className)}>
       <div className="flex items-baseline justify-between">
         <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          {estimate ? "Spend (est.)" : "Spend"}
+          {estimate ? "Spent so far (est.)" : "Spent so far"}
         </span>
         <span className="font-mono text-sm tabular-nums">
           {formatUsd(budget.totalSpentUsd)}{" "}

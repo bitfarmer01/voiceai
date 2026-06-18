@@ -54,20 +54,20 @@ export function GuardPanel({
   );
 }
 
-// 1 — Concurrency
+// 1 — Too many calls at once
 export function DemoBusyPanel({ slots = 3 }: { slots?: number }) {
   return (
     <GuardPanel
       tone="info"
       icon={Users}
-      title="Demo's busy — all live slots are in use"
+      title="The demo's busy right now"
       action={
         <Button asChild variant="outline" size="sm">
-          <Link href="/leaderboard">Watch the leaderboard while you wait</Link>
+          <Link href="/calls">See past calls while you wait</Link>
         </Button>
       }
     >
-      All {slots} live lines are taken right now. You may be placed in a short queue.
+      We keep only {slots} demo calls going at once so it stays free for everyone. Hang on a moment and try again.
     </GuardPanel>
   );
 }
@@ -82,30 +82,30 @@ export function VisitorCapPanel({ resetsInMs }: { resetsInMs: number }) {
   );
 }
 
-// 3 — Daily budget
+// 3 — Daily spending limit
 export function DailyBudgetPanel() {
   return (
-    <GuardPanel tone="warning" icon={Wallet} title="$8 daily budget reached">
-      We cap daily spend to keep this demo free. Try again tomorrow. You can still browse past calls
-      and provider comparisons.
+    <GuardPanel tone="warning" icon={Wallet} title="That's the demo's spending limit for today">
+      We set a small daily limit so the demo stays free. Please try again tomorrow — you can still
+      look back at past calls in the meantime.
     </GuardPanel>
   );
 }
 
-// 4 — Total budget
+// 4 — Total spending limit
 export function TotalBudgetPanel() {
   return (
     <GuardPanel
       tone="danger"
       icon={Trophy}
-      title="We've reached the $40 global budget"
+      title="The demo has reached its overall spending limit"
       action={
         <Button asChild variant="outline" size="sm">
-          <Link href="/leaderboard">Explore the read-only data</Link>
+          <Link href="/calls">Look back at past calls</Link>
         </Button>
       }
     >
-      Voice is paused for now, but you can still browse all the past calls and comparisons.
+      New calls are paused for now, but you can still look back at every past call.
     </GuardPanel>
   );
 }
@@ -124,7 +124,7 @@ export function MicPermissionPanel({ denied = false, onRequest }: { denied?: boo
           </Button>
         }
       >
-        Click the mic/lock icon in your browser's address bar → allow microphone → reload.
+        Click the mic/lock icon in your browser&apos;s address bar → allow microphone → reload.
       </GuardPanel>
     );
   }
@@ -161,8 +161,8 @@ export function ConsentDialog({
         <DialogHeader>
           <DialogTitle>Before we start the call</DialogTitle>
           <DialogDescription>
-            This demo records the call to produce your transcript and a replay. PII is
-            redacted before logging and everything auto-purges after 24 hours.
+            This demo records the call so it can write up a summary for you afterward. Personal
+            details are kept private, and the recording is deleted automatically after 24 hours.
           </DialogDescription>
         </DialogHeader>
         <label className="flex items-start gap-3 rounded-md border p-3 text-sm">
@@ -172,7 +172,7 @@ export function ConsentDialog({
             onChange={(e) => setChecked(e.target.checked)}
             className="mt-0.5 size-4 accent-[var(--primary)]"
           />
-          <span>I understand this call is recorded for the demo and will auto-purge in 24h.</span>
+          <span>I understand this call is recorded for the demo and is deleted after 24 hours.</span>
         </label>
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
@@ -196,7 +196,7 @@ export function ConsentDialog({
 // 7 — Time cap (in-call 120s wrap-up toast)
 export function notifyTimeCap(secondsLeft = 15) {
   toast.warning("Wrapping up soon", {
-    description: `This demo call ends in ${secondsLeft}s. Your report will be ready right after.`,
+    description: `This demo call ends in ${secondsLeft}s. Your summary will be ready right after.`,
     duration: 6000,
   });
 }

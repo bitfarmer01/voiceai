@@ -11,6 +11,7 @@ import { bookingFromStructuredData } from "@/lib/calls/booking";
 import { PRESETS, getPreset } from "@/lib/data/presets";
 import { useBudgetState } from "@/lib/data";
 import { useVisitorKey } from "@/lib/hooks/use-visitor-key";
+import { TechnicalOnly } from "@/lib/view-mode";
 import { DEFAULT_PIPELINE, buildAssistant, buildAssistantFromConvexBusiness, type PipelineSelection } from "@/lib/vapi/assistant";
 import { DocUploader, type UploadState } from "@/components/try/doc-uploader";
 import { BusinessForm } from "@/components/try/business-form";
@@ -283,11 +284,11 @@ export default function TryPage() {
       {/* Global status strip */}
       <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border bg-card px-4 py-2 font-mono text-xs text-muted-foreground">
         <span>
-          <span className="text-foreground tabular-nums">{budget.activeCalls}</span> of {budget.maxConcurrent} lines live
+          <span className="text-foreground tabular-nums">{budget.activeCalls}</span> of {budget.maxConcurrent} calls happening now
         </span>
         <span className="text-muted-foreground/40">·</span>
         <span>
-          est. <span className="text-foreground tabular-nums">{formatUsd(budget.totalSpentUsd)}</span> / {formatUsd(budget.totalCapUsd, 0)} today
+          spent <span className="text-foreground tabular-nums">{formatUsd(budget.totalSpentUsd)}</span> of {formatUsd(budget.totalCapUsd, 0)} today
         </span>
       </div>
 
@@ -306,7 +307,7 @@ export default function TryPage() {
                     : "text-muted-foreground hover:text-foreground",
                 )}
               >
-                Presets
+                Examples
               </button>
               <button
                 onClick={() => setMode("custom")}
@@ -317,7 +318,7 @@ export default function TryPage() {
                     : "text-muted-foreground hover:text-foreground",
                 )}
               >
-                Custom
+                My business
               </button>
             </div>
 
@@ -399,8 +400,8 @@ export default function TryPage() {
               <h2 className="text-sm font-semibold">
                 {mode !== "preset" && uploadedBizQ ? uploadedBizQ.companyName : preset.name}
               </h2>
-              <Badge variant="secondary" className="font-mono text-[10px]">
-                {mode !== "preset" && uploadedBizQ ? uploadedBizQ.chunks.length : preset.chunkCount} chunks
+              <Badge variant="secondary" className="text-[10px]">
+                Ready to answer
               </Badge>
             </div>
             <p className="text-xs text-muted-foreground">
@@ -413,10 +414,12 @@ export default function TryPage() {
             </div>
           </section>
 
-          <section className="rounded-xl border bg-card p-4">
-            <h2 className="mb-3 text-sm font-semibold">Voice pipeline</h2>
-            <PipelineSelector value={pipeline} onChange={setPipeline} liveCall={call.status === "live"} />
-          </section>
+          <TechnicalOnly>
+            <section className="rounded-xl border bg-card p-4">
+              <h2 className="mb-3 text-sm font-semibold">Voice pipeline</h2>
+              <PipelineSelector value={pipeline} onChange={setPipeline} liveCall={call.status === "live"} />
+            </section>
+          </TechnicalOnly>
         </div>
 
         {/* CENTER — Live stage */}
@@ -458,7 +461,7 @@ export default function TryPage() {
           <div className="min-h-0 flex-1 border-t p-4">
             {call.turns.length === 0 ? (
               <EmptyState
-                title={call.status === "idle" ? "Transcript appears here" : "Listening…"}
+                title={call.status === "idle" ? "The conversation shows up here" : "Listening…"}
                 description={call.status === "idle" ? "Press Talk to start the conversation." : undefined}
               />
             ) : (
@@ -467,31 +470,36 @@ export default function TryPage() {
           </div>
         </div>
 
-        {/* RIGHT — Live trace */}
+        {/* RIGHT — Spending + what the receptionist will and won't do */}
         <div className="space-y-4">
           <section className="rounded-xl border bg-card p-4">
-            <h2 className="mb-3 text-sm font-semibold">Budget guard</h2>
+            <h2 className="mb-3 text-sm font-semibold">Spending</h2>
             <BudgetMeter budget={budget} estimate />
           </section>
 
           <section className="rounded-xl border bg-card p-4">
-            <h2 className="mb-3 text-sm font-semibold">Live trace</h2>
+            <h2 className="mb-3 text-sm font-semibold">This call</h2>
             {call.status === "live" ? (
-              <p className="font-mono text-xs text-muted-foreground">
-                Streaming {call.turns.length} turn{call.turns.length === 1 ? "" : "s"}. The full breakdown appears in your post-call report.
+              <p className="text-xs text-muted-foreground">
+                {call.turns.length} message{call.turns.length === 1 ? "" : "s"} so far. You&apos;ll get a plain-English summary the moment the call ends.
               </p>
             ) : (
               <p className="text-xs text-muted-foreground">
-                Timing details appear here once the call starts.
+                Once the call starts, you&apos;ll see the conversation here and a summary right after.
               </p>
             )}
           </section>
 
           <section className="rounded-xl border bg-card p-4">
-            <h2 className="mb-2 text-sm font-semibold">Guardrails</h2>
-            <p className="mb-2 text-[11px] text-muted-foreground">Guarded against:</p>
+            <h2 className="mb-2 text-sm font-semibold">Stays on track</h2>
+            <p className="mb-2 text-[11px] text-muted-foreground">The receptionist always:</p>
             <div className="flex flex-wrap gap-1.5">
-              {["Injection", "Hallucination", "Stay-in-role", "Abuse"].map((g) => (
+              {[
+                "Answers only from your info",
+                "Won't make things up",
+                "Stays on your business",
+                "Stays polite",
+              ].map((g) => (
                 <span key={g} className="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
                   <ShieldCheck className="size-3" aria-hidden />
                   {g}

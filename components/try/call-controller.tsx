@@ -59,7 +59,7 @@ export function CallController({
 
         <div className="relative">
           {status === "live" && (
-            <svg className="absolute -inset-1.5 -rotate-90" width="92" height="92" viewBox="0 0 92 92" aria-hidden>
+            <svg className="pointer-events-none absolute -inset-3.5 -rotate-90" width="92" height="92" viewBox="0 0 92 92" aria-hidden>
               <circle cx="46" cy="46" r={R} fill="none" stroke="var(--border)" strokeWidth="3" />
               <circle
                 cx="46"
@@ -106,7 +106,7 @@ export function CallController({
       </div>
       )}
 
-      {status === "idle" && <p className="text-xs text-muted-foreground">Talk · 120-second demo · mic asked once</p>}
+      {status === "idle" && <p className="text-xs text-muted-foreground">A quick demo call · we ask for your mic once</p>}
 
       {status === "ended" && (
         // One primary next action (the report — this demo's payoff) plus a quiet
@@ -115,7 +115,7 @@ export function CallController({
         <div className="flex w-full max-w-64 flex-col items-center gap-2">
           {reportHref && (
             <Button asChild className="w-full">
-              <Link href={reportHref}>View post-call report</Link>
+              <Link href={reportHref}>See the call summary</Link>
             </Button>
           )}
           <Button
