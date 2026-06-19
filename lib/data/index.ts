@@ -2,9 +2,11 @@
 
 /**
  * The data seam. Screens import these hooks — never the fixtures directly.
- * Reads now flow through live Convex reactive queries where a backend query exists;
- * providers/provider-stats stay on mock until Wave B writes those queries. Same return
- * shapes throughout, so no screen changed when reads went live.
+ * Reads are live: every number flows through a Convex reactive query — no fabricated
+ * fallbacks. The two list hooks (useRecentCalls, useProviderStats) return `undefined`
+ * while the query is still loading and `[]` when there genuinely is no data, so screens
+ * can show an honest skeleton or empty state instead of a fake number. useProviders
+ * returns the static CATALOG of selectable voices/options (config, not a measured metric).
  */
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -15,11 +17,7 @@ import type {
   ProviderKind,
   ProviderStat,
 } from "@/lib/types";
-import {
-  MOCK_PROVIDERS,
-  MOCK_PROVIDER_STATS,
-  MOCK_RECENT_CALLS,
-} from "@/lib/data/mock";
+import { PROVIDER_CATALOG } from "@/lib/data/providers-catalog";
 
 const FALLBACK_BUDGET: BudgetState = {
   totalSpentUsd: 0,
@@ -34,24 +32,22 @@ export function useBudgetState(): BudgetState {
   return useQuery(api.budget.getPublicState) ?? FALLBACK_BUDGET;
 }
 
-export function useActiveCallCount(): number {
-  return useQuery(api.calls.activeCount) ?? 0;
+/** `undefined` while loading · `[]` when there are genuinely no calls yet. */
+export function useRecentCalls(): CallSummary[] | undefined {
+  return useQuery(api.calls.listRecent, { limit: 24 }) as
+    | CallSummary[]
+    | undefined;
 }
 
-export function useCallsToday(): number {
-  return useQuery(api.calls.countToday) ?? 0;
-}
-
-export function useRecentCalls(): CallSummary[] {
-  const data = useQuery(api.calls.listRecent, { limit: 24 });
-  return (data as CallSummary[] | undefined) ?? MOCK_RECENT_CALLS;
-}
-
-export function useProviderStats(kind?: ProviderKind): ProviderStat[] {
-  const data = useQuery(api.providerStats.list, kind ? { kind } : {});
-  return (data as ProviderStat[] | undefined) ?? MOCK_PROVIDER_STATS;
+/** `undefined` while loading · `[]` when no provider stats exist yet. */
+export function useProviderStats(
+  kind?: ProviderKind,
+): ProviderStat[] | undefined {
+  return useQuery(api.providerStats.list, kind ? { kind } : {}) as
+    | ProviderStat[]
+    | undefined;
 }
 
 export function useProviders(kind?: ProviderKind): Provider[] {
-  return kind ? MOCK_PROVIDERS.filter((p) => p.kind === kind) : MOCK_PROVIDERS;
+  return kind ? PROVIDER_CATALOG.filter((p) => p.kind === kind) : PROVIDER_CATALOG;
 }

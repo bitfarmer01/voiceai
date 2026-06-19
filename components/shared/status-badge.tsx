@@ -1,12 +1,11 @@
 import {
-  Bookmark,
   CheckCircle,
   Circle,
   PhoneSlash,
   XCircle,
 } from "@phosphor-icons/react/dist/ssr";
 import { cn } from "@/lib/utils";
-import type { CallStatus, CallOutcome, EvalStatus } from "@/lib/types";
+import type { CallStatus, EvalStatus } from "@/lib/types";
 
 function CircleFill({ className }: { className?: string }) {
   return <Circle weight="fill" className={className} />;
@@ -34,23 +33,6 @@ export function CallStatusBadge({ status, className }: { status: CallStatus; cla
     <span className={cn(base, s.cls, className)}>
       <Icon className={cn("size-3", s.pulse && "animate-pulse")} />
       {s.label}
-    </span>
-  );
-}
-
-const OUTCOME: Record<CallOutcome, { label: string; cls: string; icon: React.ElementType }> = {
-  booked: { label: "Booked", cls: "border-success/20 bg-success-subtle text-success", icon: CheckCircle },
-  intent: { label: "Intent", cls: "border-info/20 bg-info-subtle text-info", icon: Bookmark },
-  abandoned: { label: "Abandoned", cls: "border-warning/20 bg-warning-subtle text-warning", icon: Circle },
-};
-
-export function OutcomeBadge({ outcome, className }: { outcome: CallOutcome; className?: string }) {
-  const o = OUTCOME[outcome];
-  const Icon = o.icon;
-  return (
-    <span className={cn(base, o.cls, className)}>
-      <Icon className="size-3" />
-      {o.label}
     </span>
   );
 }

@@ -147,6 +147,11 @@ export default defineSchema({
     qualityMetrics: v.optional(qualityMetrics),
     guardrailEvents: v.optional(v.array(v.string())),
     visitorKey: v.optional(v.string()),
+    // Per-call idempotency markers for split-brain finalization (endCall vs the
+    // webhook). Each fact is released/recorded independently exactly once,
+    // regardless of teardown order. Additive optionals — frozen-contract-safe.
+    concurrencyReleased: v.optional(v.boolean()),
+    costRecorded: v.optional(v.boolean()),
   })
     .index("by_vapiCallId", ["vapiCallId"])
     .index("by_session", ["sessionId"])

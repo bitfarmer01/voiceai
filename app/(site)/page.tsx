@@ -104,7 +104,7 @@ export default function LandingPage() {
               href="/leaderboard"
               className="mt-6 inline-flex items-center gap-1.5 text-sm font-medium text-foreground underline decoration-primary decoration-2 underline-offset-4 transition-colors hover:text-primary"
             >
-              Want the technical detail? See live traces and benchmarks
+              Curious how it stacks up? Take a look under the hood
               <ArrowRight weight="bold" className="size-3.5 text-primary" />
             </Link>
           </div>

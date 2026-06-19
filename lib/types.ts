@@ -7,6 +7,11 @@
 
 // ── Frozen StatusBadge vocabulary ──────────────────────────────────────────────
 export type CallStatus = "idle" | "connecting" | "live" | "ended";
+
+/** A call is "busy" while it is connecting or live (i.e. actively in progress). */
+export function callIsBusy(status: CallStatus): boolean {
+  return status === "live" || status === "connecting";
+}
 export type CallOutcome = "booked" | "intent" | "abandoned";
 export type EvalStatus = "pass" | "fail";
 

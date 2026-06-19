@@ -35,6 +35,9 @@ yarn-debug.log*
 # playwright mcp scratch
 /.playwright-mcp/
 
+# superpowers brainstorm scratch (mockups, companion server state)
+/.superpowers/
+
 # local claude settings
 .claude/settings.local.json
 

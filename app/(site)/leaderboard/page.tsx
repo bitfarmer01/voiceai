@@ -3,12 +3,14 @@
 import * as React from "react";
 import { ArrowsDownUp, Lightning, CurrencyDollar, Star } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
-import { formatMs, formatUsd, latencyColorVar } from "@/lib/format";
+import { formatMs, formatUsd, formatCount, latencyColorVar } from "@/lib/format";
 import { useProviderStats } from "@/lib/data";
 import { Button } from "@/components/ui/button";
 import { ProviderChip } from "@/components/shared/provider-chip";
-import { DemoDataBadge } from "@/components/shared/demo-data-badge";
+import { BuilderViewBanner } from "@/components/shared/builder-view-banner";
 import { EmptyState } from "@/components/states/empty-state";
+import { matchQuery } from "@/components/states/async-section";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -172,7 +174,7 @@ function RankingTable({ stats, kind }: { stats: ProviderStat[]; kind: ProviderKi
               </TableCell>
               <TableCell className="font-mono text-sm tabular-nums">★ {s.avgRating.toFixed(1)}</TableCell>
               <TableCell className="font-mono text-xs tabular-nums text-muted-foreground">
-                {s.callCount.toLocaleString()}
+                {formatCount(s.callCount)}
               </TableCell>
             </TableRow>
           ))}
@@ -197,36 +199,65 @@ function CategoryPanel({ stats, kind }: { stats: ProviderStat[]; kind: ProviderK
 }
 
 export default function LeaderboardPage() {
+  // `undefined` while the Convex query loads · `[]` once it returns with no rows.
   const stats = useProviderStats();
 
   return (
     <div className="mx-auto w-full max-w-5xl px-4 py-10 sm:px-6">
+      <BuilderViewBanner />
+
       <div className="mb-8">
-        <div className="flex items-center gap-2">
-          <h1 className="text-2xl font-bold">Provider Leaderboard</h1>
-          <DemoDataBadge />
-        </div>
+        <h1 className="text-2xl font-bold text-balance">Provider Leaderboard</h1>
         <p className="mt-1 text-sm text-pretty text-muted-foreground">
           Compare speed, cost, and quality for every provider in the voice pipeline.
         </p>
       </div>
 
-      <Tabs defaultValue="stt" className="gap-4">
-        <TabsList>
-          <TabsTrigger value="stt">STT</TabsTrigger>
-          <TabsTrigger value="tts">TTS</TabsTrigger>
-          <TabsTrigger value="llm">LLM</TabsTrigger>
-        </TabsList>
-        <TabsContent value="stt">
-          <CategoryPanel stats={stats} kind="stt" />
-        </TabsContent>
-        <TabsContent value="tts">
-          <CategoryPanel stats={stats} kind="tts" />
-        </TabsContent>
-        <TabsContent value="llm">
-          <CategoryPanel stats={stats} kind="llm" />
-        </TabsContent>
-      </Tabs>
+      {matchQuery(stats, {
+        loading: <LeaderboardSkeleton />,
+        empty: (
+          <EmptyState
+            title="No calls yet"
+            description="These fill in once real calls come through."
+            action={{ label: "Try it", href: "/try" }}
+          />
+        ),
+        data: (rows) => (
+          <Tabs defaultValue="stt" className="gap-4">
+            <TabsList>
+              <TabsTrigger value="stt">STT</TabsTrigger>
+              <TabsTrigger value="tts">TTS</TabsTrigger>
+              <TabsTrigger value="llm">LLM</TabsTrigger>
+            </TabsList>
+            <TabsContent value="stt">
+              <CategoryPanel stats={rows} kind="stt" />
+            </TabsContent>
+            <TabsContent value="tts">
+              <CategoryPanel stats={rows} kind="tts" />
+            </TabsContent>
+            <TabsContent value="llm">
+              <CategoryPanel stats={rows} kind="llm" />
+            </TabsContent>
+          </Tabs>
+        ),
+      })}
+    </div>
+  );
+}
+
+function LeaderboardSkeleton() {
+  return (
+    <div className="space-y-4">
+      <Skeleton className="h-9 w-48 rounded-md" />
+      <section className="rounded-xl border bg-card p-5 sm:p-6">
+        <Skeleton className="mb-4 h-4 w-56 rounded" />
+        <div className="mb-4 grid gap-3 sm:grid-cols-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} className="h-20 rounded-lg" />
+          ))}
+        </div>
+        <Skeleton className="h-64 rounded-lg" />
+      </section>
     </div>
   );
 }

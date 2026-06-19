@@ -38,9 +38,9 @@ test("insertUploadedBusiness: inserts business + chunks, sets expiresAt", async 
 
   const result = await t.query(api.businesses.getWithChunks, { businessId });
   expect(result).not.toBeNull();
-  expect(result!.companyName).toBe("Test Co");
-  expect(result!.hours).toBe("Mon–Fri 9–5");
-  expect(result!.services).toEqual(["Service A", "Service B"]);
+  expect(result!.profile.companyName).toBe("Test Co");
+  expect(result!.profile.hours).toBe("Mon–Fri 9–5");
+  expect(result!.profile.services).toEqual(["Service A", "Service B"]);
   expect(result!.chunks).toHaveLength(2);
   expect(result!.chunks[0].text).toBe("We are open Mon–Fri 9am to 5pm.");
 });
@@ -93,6 +93,6 @@ test("insertUploadedBusiness with no storage args: inserts business, sourceMeta 
 
   const result = await t.query(api.businesses.getWithChunks, { businessId });
   expect(result).not.toBeNull();
-  expect(result!.companyName).toBe("Acme");
+  expect(result!.profile.companyName).toBe("Acme");
   expect(result!.chunks).toHaveLength(1);
 });

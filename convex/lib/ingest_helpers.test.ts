@@ -9,6 +9,9 @@ import {
   buildOcrPrompt,
   buildFormExpansionPrompt,
   clampFormInput,
+  clampDraftInput,
+  buildFormDraftPrompt,
+  buildSuggestPrompt,
   htmlToText,
   assertSafeUrl,
   isPrivateOrReservedIp,
@@ -198,6 +201,215 @@ describe("buildFormExpansionPrompt", () => {
       description: "A tech startup",
     });
     expect(result).toContain("chunks");
+  });
+});
+
+describe("clampDraftInput", () => {
+  it("throws when companyName is empty after trim", () => {
+    expect(() =>
+      clampDraftInput({ companyName: "   ", businessType: "Dental clinic", services: [] })
+    ).toThrow("ingest_failed: company name is required");
+  });
+
+  it("throws when companyName is 1 character", () => {
+    expect(() =>
+      clampDraftInput({ companyName: "A", businessType: "Dental clinic", services: [] })
+    ).toThrow("ingest_failed: company name must be at least 2 characters");
+  });
+
+  it("throws when businessType is blank after trim", () => {
+    expect(() =>
+      clampDraftInput({ companyName: "Acme", businessType: "  ", services: [] })
+    ).toThrow("ingest_failed: business type is required");
+  });
+
+  it("clamps companyName to 120 chars", () => {
+    const longName = "A".repeat(150);
+    const result = clampDraftInput({
+      companyName: longName,
+      businessType: "Dental clinic",
+      services: [],
+    });
+    expect(result.companyName).toHaveLength(120);
+  });
+
+  it("clamps businessType to 80 chars", () => {
+    const longType = "A".repeat(100);
+    const result = clampDraftInput({
+      companyName: "Acme",
+      businessType: longType,
+      services: [],
+    });
+    expect(result.businessType).toHaveLength(80);
+  });
+
+  it("trims whitespace from all fields", () => {
+    const result = clampDraftInput({
+      companyName: "  Acme  ",
+      businessType: "  Dental clinic  ",
+      services: ["  Cleaning  "],
+    });
+    expect(result.companyName).toBe("Acme");
+    expect(result.businessType).toBe("Dental clinic");
+    expect(result.services).toEqual(["Cleaning"]);
+  });
+
+  it("drops empty services after trim", () => {
+    const result = clampDraftInput({
+      companyName: "Acme",
+      businessType: "Dental clinic",
+      services: ["Cleaning", "   ", "", "Whitening"],
+    });
+    expect(result.services).toEqual(["Cleaning", "Whitening"]);
+  });
+
+  it("dedupes services case-insensitively, keeping first occurrence", () => {
+    const result = clampDraftInput({
+      companyName: "Acme",
+      businessType: "Dental clinic",
+      services: ["Cleaning", "cleaning", "CLEANING", "Whitening"],
+    });
+    expect(result.services).toEqual(["Cleaning", "Whitening"]);
+  });
+
+  it("caps the services array at 5", () => {
+    const result = clampDraftInput({
+      companyName: "Acme",
+      businessType: "Dental clinic",
+      services: ["a", "b", "c", "d", "e", "f", "g"],
+    });
+    expect(result.services).toHaveLength(5);
+    expect(result.services).toEqual(["a", "b", "c", "d", "e"]);
+  });
+
+  it("clamps each service to 80 chars", () => {
+    const longService = "A".repeat(100);
+    const result = clampDraftInput({
+      companyName: "Acme",
+      businessType: "Dental clinic",
+      services: [longService],
+    });
+    expect(result.services[0]).toHaveLength(80);
+  });
+
+  it("returns valid input unchanged", () => {
+    const result = clampDraftInput({
+      companyName: "Glow Dental",
+      businessType: "Dental clinic",
+      services: ["Cleaning", "Whitening"],
+    });
+    expect(result).toEqual({
+      companyName: "Glow Dental",
+      businessType: "Dental clinic",
+      services: ["Cleaning", "Whitening"],
+    });
+  });
+});
+
+describe("buildFormDraftPrompt", () => {
+  it("contains companyName, businessType, and the provided services", () => {
+    const result = buildFormDraftPrompt({
+      companyName: "Glow Dental",
+      businessType: "Dental clinic",
+      services: ["Cleaning", "Whitening"],
+    });
+    expect(result).toContain("Glow Dental");
+    expect(result).toContain("Dental clinic");
+    expect(result).toContain("Cleaning");
+    expect(result).toContain("Whitening");
+  });
+
+  it("contains 'chunks'", () => {
+    const result = buildFormDraftPrompt({
+      companyName: "Glow Dental",
+      businessType: "Dental clinic",
+      services: ["Cleaning"],
+    });
+    expect(result).toContain("chunks");
+  });
+
+  it("instructs the model to preserve the company name and provided services", () => {
+    const result = buildFormDraftPrompt({
+      companyName: "Glow Dental",
+      businessType: "Dental clinic",
+      services: ["Cleaning"],
+    });
+    expect(result.toLowerCase()).toMatch(/preserve|keep|verbatim|exactly/);
+  });
+
+  it("instructs the model to generate hours, policies, and availability", () => {
+    const result = buildFormDraftPrompt({
+      companyName: "Glow Dental",
+      businessType: "Dental clinic",
+      services: ["Cleaning"],
+    });
+    expect(result.toLowerCase()).toContain("hours");
+    expect(result.toLowerCase()).toContain("policies");
+    expect(result.toLowerCase()).toContain("availability");
+  });
+
+  it("instructs the model to infer services when none are provided", () => {
+    const result = buildFormDraftPrompt({
+      companyName: "Glow Dental",
+      businessType: "Dental clinic",
+      services: [],
+    });
+    expect(result.toLowerCase()).toMatch(/infer|typical|common/);
+  });
+});
+
+describe("buildSuggestPrompt", () => {
+  it("businessType: references the partial text and company name and asks for one label", () => {
+    const result = buildSuggestPrompt({
+      field: "businessType",
+      companyName: "Glow Dental",
+      partial: "dent",
+    });
+    expect(result).toContain("Glow Dental");
+    expect(result).toContain("dent");
+    expect(result.toLowerCase()).toMatch(/one|single|label/);
+  });
+
+  it("businessType: instructs to return only the label", () => {
+    const result = buildSuggestPrompt({
+      field: "businessType",
+      companyName: "Glow Dental",
+      partial: "dent",
+    });
+    expect(result.toLowerCase()).toContain("only");
+  });
+
+  it("services: references the business type and company name", () => {
+    const result = buildSuggestPrompt({
+      field: "services",
+      companyName: "Glow Dental",
+      businessType: "Dental clinic",
+      existing: ["Cleaning"],
+    });
+    expect(result).toContain("Glow Dental");
+    expect(result).toContain("Dental clinic");
+  });
+
+  it("services: instructs to exclude already-listed services", () => {
+    const result = buildSuggestPrompt({
+      field: "services",
+      companyName: "Glow Dental",
+      businessType: "Dental clinic",
+      existing: ["Cleaning", "Whitening"],
+    });
+    expect(result).toContain("Cleaning");
+    expect(result).toContain("Whitening");
+    expect(result.toLowerCase()).toMatch(/exclud|not already|already listed|avoid/);
+  });
+
+  it("services: works with no existing list", () => {
+    const result = buildSuggestPrompt({
+      field: "services",
+      companyName: "Glow Dental",
+      businessType: "Dental clinic",
+    });
+    expect(typeof result).toBe("string");
+    expect(result.length).toBeGreaterThan(0);
   });
 });
 

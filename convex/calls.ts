@@ -19,9 +19,9 @@ import { v } from "convex/values";
 import type { Doc } from "./_generated/dataModel";
 import { BUDGET, type GuardReason } from "./_contracts";
 import {
-  addCostHelper,
-  decActiveHelper,
   incActiveHelper,
+  recordCostOnce,
+  releaseConcurrencyOnce,
 } from "./budget";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -111,6 +111,77 @@ function toCallSummary(c: Doc<"calls">) {
     languages: c.languages,
     startedAt: c.startedAt,
     ttfwMs: c.ttfwMs ?? 0,
+  };
+}
+
+/** QualityMetrics projection (mirrors schema.ts qualityMetrics). */
+const qualityMetricsValidator = v.object({
+  talkRatio: v.number(),
+  interruptions: v.number(),
+  deadAirSec: v.number(),
+  wpm: v.number(),
+  sentiment: v.optional(v.number()),
+});
+
+/**
+ * Non-PII projection of a call for the owner-facing /calls/[id] report.
+ * Deliberately EXCLUDES sessionId, vapiCallId, visitorKey, and the internal
+ * finalization markers (concurrencyReleased/costRecorded) — the report renders
+ * none of them, and internal keys shouldn't cross the read seam. Typing the
+ * return here is the single owner of the report shape, replacing the
+ * hand-maintained `as {…}` cast the client used to carry.
+ */
+const callReportValidator = v.object({
+  _id: v.id("calls"),
+  businessName: v.string(),
+  status: v.union(
+    v.literal("idle"),
+    v.literal("connecting"),
+    v.literal("live"),
+    v.literal("ended"),
+  ),
+  outcome: v.optional(
+    v.union(v.literal("booked"), v.literal("intent"), v.literal("abandoned")),
+  ),
+  startedAt: v.number(),
+  endedAt: v.optional(v.number()),
+  durationSec: v.number(),
+  costUsd: v.number(),
+  costBreakdown: costBreakdownValidator,
+  sttProvider: v.string(),
+  ttsProvider: v.string(),
+  ttsVoice: v.optional(v.string()),
+  llmProvider: v.string(),
+  languages: v.array(v.string()),
+  ttfwMs: v.optional(v.number()),
+  successEval: v.optional(v.boolean()),
+  summary: v.optional(v.string()),
+  structuredData: v.optional(v.any()),
+  qualityMetrics: v.optional(qualityMetricsValidator),
+});
+
+/** Map a call doc → the non-PII report projection. */
+function toCallReport(c: Doc<"calls">) {
+  return {
+    _id: c._id,
+    businessName: c.businessName,
+    status: c.status,
+    outcome: c.outcome,
+    startedAt: c.startedAt,
+    endedAt: c.endedAt,
+    durationSec: c.durationSec,
+    costUsd: c.costUsd,
+    costBreakdown: c.costBreakdown,
+    sttProvider: c.sttProvider,
+    ttsProvider: c.ttsProvider,
+    ttsVoice: c.ttsVoice,
+    llmProvider: c.llmProvider,
+    languages: c.languages,
+    ttfwMs: c.ttfwMs,
+    successEval: c.successEval,
+    summary: c.summary,
+    structuredData: c.structuredData,
+    qualityMetrics: c.qualityMetrics,
   };
 }
 
@@ -208,8 +279,10 @@ export const getByVapiId = query({
 });
 
 // ── getById ───────────────────────────────────────────────────────────────────
-// Ownership-gated: the full call record carries PII (structuredData.booking =
-// customer name + contact), so we only return it to the visitor who owns the call.
+// Ownership-gated AND projected: the call record carries PII (structuredData.booking =
+// customer name + contact) plus internal keys, so we (a) only return it to the visitor
+// who owns the call and (b) return a typed non-PII projection (toCallReport) — never the
+// raw doc — so sessionId/vapiCallId/visitorKey can't leak even to the owner's client.
 // We gate on `visitorKey` (NOT sessionId, which recordQualityMetrics uses): this
 // query is read by the /calls/[id] report page, which holds only the persisted
 // per-browser visitorKey — the per-call sessionId is an in-memory UUID it cannot
@@ -218,11 +291,11 @@ export const getByVapiId = query({
 // identical to a missing call, so cross-visitor PII is never exposed.
 export const getById = query({
   args: { callId: v.id("calls"), visitorKey: v.string() },
-  returns: v.union(v.any(), v.null()),
+  returns: v.union(callReportValidator, v.null()),
   handler: async (ctx, args) => {
     const call = await ctx.db.get(args.callId);
     if (!call || call.visitorKey !== args.visitorKey) return null;
-    return call;
+    return toCallReport(call);
   },
 });
 
@@ -396,10 +469,6 @@ export const recordEndOfCall = internalMutation({
       return null;
     }
 
-    // A second end-of-call webhook for the same call must not double-count
-    // cost or double-decrement concurrency.
-    const alreadyEnded = call.status === "ended";
-
     const now = Date.now();
     const endedAt = call.startedAt + args.durationSec * 1000;
 
@@ -427,13 +496,16 @@ export const recordEndOfCall = internalMutation({
       outcome,
     });
 
-    if (!alreadyEnded) {
-      // Decrement concurrency and add the actual reported cost to the budget,
-      // bucketed against the call's OWN day so a call that crosses midnight
-      // accounts to the day it started.
-      await decActiveHelper(ctx);
-      await addCostHelper(ctx, args.costUsd, dayBucket(call.startedAt));
-    }
+    // Record cost and release concurrency, each independently idempotent via
+    // per-call markers (budget.recordCostOnce / releaseConcurrencyOnce). A
+    // second webhook, or a client endCall that already released the slot, is a
+    // no-op — but a dropped cost (client endCall first, which canNOT know cost)
+    // is still recorded here. `call` is the doc as read at the top of this
+    // handler, so its markers reflect DB state before this mutation. Cost is
+    // bucketed against the call's OWN day so a midnight-crossing call accounts
+    // to the day it started.
+    await recordCostOnce(ctx, call, args.costUsd, dayBucket(call.startedAt));
+    await releaseConcurrencyOnce(ctx, call);
 
     return null;
   },

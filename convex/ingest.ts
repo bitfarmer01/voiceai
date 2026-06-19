@@ -1,21 +1,19 @@
 "use node";
 
 import { action } from "./_generated/server";
-import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
-import { z } from "zod";
 import {
-  sanitizeProfile,
-  businessProfileSchema,
   isImageMime,
   toDataUrl,
   buildExtractionPrompt,
   buildOcrPrompt,
 } from "./lib/ingest_helpers";
+import { extractAndInsert } from "./sources";
 
+// NIM_MODEL / sanitize / insert now live in extractAndInsert (./sources). Only the
+// VLM OCR model + the file/text size caps remain document-specific here.
 const NIM_BASE_URL = "https://integrate.api.nvidia.com/v1";
-const NIM_MODEL = "nvidia/nemotron-3-nano-30b-a3b";
 const NIM_VLM_MODEL = "nvidia/llama-3.1-nemotron-nano-vl-8b-v1";
 const MAX_FILE_BYTES = 5 * 1024 * 1024; // 5 MB
 const MAX_TEXT_CHARS = 50_000;
@@ -96,40 +94,12 @@ export const ingestDocument = action({
     }
     const text = rawText.length > MAX_TEXT_CHARS ? rawText.slice(0, MAX_TEXT_CHARS) : rawText;
 
-    const { createOpenAI } = await import("@ai-sdk/openai");
-    const { generateObject } = await import("ai");
-
-    const nim = createOpenAI({
-      baseURL: NIM_BASE_URL,
-      apiKey: process.env.NVIDIA_NIM_API_KEY ?? "",
+    // Same NIM-extract → sanitize → insert tail as every other source; the only
+    // document-specific addition is recording the storage handle on the business.
+    return extractAndInsert(ctx, args.sessionId, buildExtractionPrompt(text), {
+      storageId: args.storageId,
+      fileName: args.fileName,
+      mimeType: args.mimeType,
     });
-
-    const { object } = await generateObject({
-      model: nim(NIM_MODEL),
-      schema: businessProfileSchema(z),
-      prompt: buildExtractionPrompt(text),
-    });
-
-    const sanitized = sanitizeProfile({
-      companyName: object.companyName,
-      hours: object.hours,
-      services: object.services,
-      policies: object.policies,
-      availability: object.availability,
-      chunks: object.chunks,
-    });
-
-    const businessId = await ctx.runMutation(
-      internal.businesses.insertUploadedBusiness,
-      {
-        sessionId: args.sessionId,
-        storageId: args.storageId,
-        fileName: args.fileName,
-        mimeType: args.mimeType,
-        ...sanitized,
-      },
-    );
-
-    return { businessId };
   },
 });

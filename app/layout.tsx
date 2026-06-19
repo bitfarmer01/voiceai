@@ -21,9 +21,9 @@ const mono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Receptionist · Voice AI",
+  title: "The receptionist that never misses a call",
   description:
-    "Talk to a document-grounded AI voice receptionist — live in the browser, no signup. Built with production observability, provider benchmarking, evals, and a hard budget guard.",
+    "A friendly AI receptionist that answers your calls, books appointments, and takes messages — using your own business details. Try it live in your browser, no signup.",
 };
 
 // Signal Bold brand tokens: ink #121210 (dark bg) / paper #F4F4EE (light bg)

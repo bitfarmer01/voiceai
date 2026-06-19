@@ -4,11 +4,9 @@
  * the post-call report render bookings the same way (and so it's unit-testable).
  */
 import type { Booking } from "@/lib/types";
-
-/** Read a property off an unknown value, or undefined if it isn't an object. */
-function prop(obj: unknown, key: string): unknown {
-  return obj && typeof obj === "object" ? (obj as Record<string, unknown>)[key] : undefined;
-}
+// Relative (not "@/lib/unknown"): this module is exercised by Vitest, whose
+// resolver doesn't apply the "@/" tsconfig path alias to runtime value imports.
+import { asNumber, asString, prop } from "../unknown";
 
 /**
  * Extract a typed `Booking` from a call's `structuredData` (loosely `v.any()` on
@@ -22,21 +20,14 @@ export function bookingFromStructuredData(structuredData: unknown): Booking | nu
   const confirmationId = prop(raw, "confirmationId");
   if (typeof confirmationId !== "string" || confirmationId === "") return null;
 
-  const slot = prop(raw, "slot");
-  const customerName = prop(raw, "customerName");
-  const contact = prop(raw, "contact");
-  const service = prop(raw, "service");
-  const notes = prop(raw, "notes");
-  const bookedAt = prop(raw, "bookedAt");
-
   return {
     confirmationId,
-    slot: typeof slot === "string" ? slot : "",
-    customerName: typeof customerName === "string" ? customerName : "",
-    contact: typeof contact === "string" ? contact : "",
-    service: typeof service === "string" ? service : null,
-    notes: typeof notes === "string" ? notes : null,
-    bookedAt: typeof bookedAt === "number" ? bookedAt : 0,
+    slot: asString(prop(raw, "slot")) ?? "",
+    customerName: asString(prop(raw, "customerName")) ?? "",
+    contact: asString(prop(raw, "contact")) ?? "",
+    service: asString(prop(raw, "service")) ?? null,
+    notes: asString(prop(raw, "notes")) ?? null,
+    bookedAt: asNumber(prop(raw, "bookedAt")) ?? 0,
   };
 }
 

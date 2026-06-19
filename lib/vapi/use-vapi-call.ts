@@ -8,14 +8,21 @@ import { getVapi } from "./client";
 import { notifyTimeCap } from "@/components/states/guard-panels";
 import { deriveSpansFromEvents, type VapiEvent } from "./derive-spans";
 import { computeQualityMetrics } from "@/lib/calls/quality-metrics";
-import type { CallStatus, TranscriptTurn } from "@/lib/types";
+import { callIsBusy, type CallStatus, type TranscriptTurn } from "@/lib/types";
+import { prop } from "@/lib/unknown";
+import { BUDGET } from "@/convex/_contracts";
 
-const MAX_SECONDS = 120;
+/** Canonical per-call length cap — single source of truth in the budget contract.
+ *  Annotated `number` (not the `as const` literal) so `useState`/`setSecondsLeft`
+ *  infer a numeric counter rather than the literal type. */
+const MAX_SECONDS: number = BUDGET.MAX_CALL_SECONDS;
 /** How often we flush the buffered trace to Convex during a live call. */
 const FLUSH_INTERVAL_MS = 5000;
 
 export interface VapiCall {
   status: CallStatus;
+  /** True while the call is connecting or live (status === "connecting" | "live"). */
+  inProgress: boolean;
   turns: TranscriptTurn[];
   volume: number;
   agentSpeaking: boolean;
@@ -48,11 +55,6 @@ function applyTranscript(
     arr.push({ idx: nextIdx(), role, text, ts: Date.now(), interim: !final });
   }
   return arr;
-}
-
-/** Safely read a property off an unknown object. */
-function prop(obj: unknown, key: string): unknown {
-  return obj && typeof obj === "object" ? (obj as Record<string, unknown>)[key] : undefined;
 }
 
 /**
@@ -190,17 +192,30 @@ export function useVapiCall(): VapiCall {
       const callId = callIdRef.current;
       const sessionId = sessionIdRef.current;
       const callStartMs = callStartRef.current;
+      // DEBUG(spans): guard state + buffer size on every flush
+      console.debug("DEBUG(spans) flush", {
+        final,
+        callId,
+        sessionId,
+        callStartMs,
+        events: eventsRef.current.length,
+      });
       if (!callId || !sessionId || callStartMs == null) return;
 
       const spans = deriveSpansFromEvents(eventsRef.current, {
         traceId: callId,
         callStartMs,
       });
+      // DEBUG(spans): how many spans the buffer derived
+      console.debug("DEBUG(spans) derived", { spans: spans.length });
       if (spans.length > 0) {
         try {
           await batchWriteSpans({ callId, sessionId, spans });
-        } catch {
-          /* best-effort telemetry; the buffer is kept for the next flush */
+          // DEBUG(spans): write resolved
+          console.debug("DEBUG(spans) batchWriteSpans ok", { spans: spans.length });
+        } catch (e) {
+          // DEBUG(spans): surface the previously-swallowed write error
+          console.error("DEBUG(spans) batchWriteSpans FAILED", e);
         }
       }
 
@@ -286,6 +301,12 @@ export function useVapiCall(): VapiCall {
     const onCallStart = () => {
       setStatus("live");
       callStartRef.current = Date.now();
+      // DEBUG(spans): call-start fired; trace clock anchored
+      console.debug("DEBUG(spans) call-start", {
+        callId: callIdRef.current,
+        sessionId: sessionIdRef.current,
+        callStartMs: callStartRef.current,
+      });
       startTimer();
       // Periodic trace flush (off the audio render path).
       stopFlushTimer();
@@ -294,6 +315,8 @@ export function useVapiCall(): VapiCall {
       }, FLUSH_INTERVAL_MS);
     };
     const onCallEnd = () => {
+      // DEBUG(spans): call-end fired; final flush about to run
+      console.debug("DEBUG(spans) call-end", { events: eventsRef.current.length });
       setStatus("ended");
       setAgentSpeaking(false);
       cancelVolumeRaf();
@@ -323,10 +346,23 @@ export function useVapiCall(): VapiCall {
       setError(e?.message ?? e?.error?.message ?? e?.errorMsg ?? "Call error — please retry.");
     const onMessage = (msg: any) => {
       const now = Date.now();
+      // DEBUG(spans): every client-message type the SDK actually delivers live
+      console.debug("DEBUG(spans) message", {
+        type: msg?.type,
+        hasTranscript: !!msg?.transcript,
+        transcriptType: msg?.transcriptType,
+        role: msg?.role,
+      });
       if (msg?.type === "transcript" && msg.transcript) {
         const role = msg.role === "assistant" ? "assistant" : "user";
         const final = msg.transcriptType === "final";
         eventsRef.current.push({ ts: now, type: "transcript", role, final, text: msg.transcript });
+        // DEBUG(spans): transcript buffered
+        console.debug("DEBUG(spans) buffered transcript", {
+          role,
+          final,
+          events: eventsRef.current.length,
+        });
         setTurns((prev) => {
           const next = applyTranscript(prev, role, msg.transcript, final, () => idxRef.current++);
           turnsRef.current = next;
@@ -430,5 +466,18 @@ export function useVapiCall(): VapiCall {
     finalFlushedRef.current = false;
   }, [cancelVolumeRaf]);
 
-  return { status, turns, volume, agentSpeaking, muted, error, secondsLeft, start, stop, toggleMute, reset };
+  return {
+    status,
+    inProgress: callIsBusy(status),
+    turns,
+    volume,
+    agentSpeaking,
+    muted,
+    error,
+    secondsLeft,
+    start,
+    stop,
+    toggleMute,
+    reset,
+  };
 }
