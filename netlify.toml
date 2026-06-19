@@ -1,0 +1,16 @@
+# Netlify build configuration — Next.js 16 + Convex (pnpm).
+#
+# The Netlify Next.js Runtime is auto-installed by Netlify when it detects Next.js.
+# Do NOT add `@netlify/plugin-nextjs` here manually — it conflicts with the auto-runtime.
+#
+# This site is the Next.js frontend only. It talks to an EXISTING Convex backend, set via
+# NEXT_PUBLIC_CONVEX_URL / NEXT_PUBLIC_CONVEX_SITE_URL in the Netlify site environment.
+# No `convex deploy` runs here. To move to a dedicated PRODUCTION Convex deployment later,
+# switch the build command to `pnpm exec convex deploy --cmd 'pnpm build'` and add a
+# CONVEX_DEPLOY_KEY (prod:...) env var (Convex then injects NEXT_PUBLIC_CONVEX_URL itself).
+[build]
+  command = "pnpm build"
+
+[build.environment]
+  # Next.js 16 requires Node >= 20.9. Netlify's default image is too old — pin it.
+  NODE_VERSION = "22"

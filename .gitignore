@@ -43,3 +43,6 @@ yarn-debug.log*
 
 # abandoned agent worktrees
 .claude/worktrees/
+
+# Local Netlify folder
+.netlify
