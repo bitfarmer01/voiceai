@@ -144,6 +144,119 @@ export function clampFormInput(raw: {
 }
 
 /**
+ * Validates and clamps the guided-draft form input (name + type + services).
+ * Mirrors `clampFormInput`'s style: trims everything, requires a usable company
+ * name and a non-empty business type, and normalizes the services list (trim, drop
+ * empties, case-insensitive dedupe keeping first occurrence, cap at 5, clamp each
+ * to 80 chars).
+ */
+export function clampDraftInput(raw: {
+  companyName: string;
+  businessType: string;
+  services: string[];
+}): { companyName: string; businessType: string; services: string[] } {
+  const companyName = raw.companyName.trim();
+  const businessType = raw.businessType.trim();
+
+  if (!companyName) {
+    throw new Error("ingest_failed: company name is required");
+  }
+
+  if (companyName.length < 2) {
+    throw new Error("ingest_failed: company name must be at least 2 characters");
+  }
+
+  if (businessType.length === 0) {
+    throw new Error("ingest_failed: business type is required");
+  }
+
+  const services: string[] = [];
+  const seen = new Set<string>();
+  for (const service of raw.services) {
+    const trimmed = service.trim();
+    if (!trimmed) continue;
+    const key = trimmed.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    services.push(trimmed.slice(0, 80));
+    if (services.length >= 5) break;
+  }
+
+  return {
+    companyName: companyName.slice(0, 120),
+    businessType: businessType.slice(0, 80),
+    services,
+  };
+}
+
+/**
+ * Builds the guided-draft expansion prompt for the LLM. Driven by businessType +
+ * services: the model must PRESERVE the given company name and the provided services
+ * (incorporating them verbatim into `services`) and GENERATE the rest — hours,
+ * policies, availability, and FAQ chunks — appropriate to the business type.
+ */
+export function buildFormDraftPrompt(input: {
+  companyName: string;
+  businessType: string;
+  services: string[];
+}): string {
+  const servicesBlock =
+    input.services.length > 0
+      ? `Services the owner provided (preserve these EXACTLY, verbatim, in the services array):
+${input.services.map((s) => `- ${s}`).join("\n")}`
+      : `The owner provided no services. Infer a few typical services a business of this type would offer and put them in the services array.`;
+
+  return `You are a business profile writer. Draft a full structured business profile for a phone receptionist from the minimal details below.
+Company name: ${input.companyName}
+Business type: ${input.businessType}
+${servicesBlock}
+
+Rules:
+- PRESERVE the company name exactly as given in companyName.
+- Keep every service the owner provided verbatim in the services array; you may add a few more typical ones that fit the business type.
+- GENERATE realistic hours, policies, and availability that fit a ${input.businessType}.
+- GENERATE up to 20 FAQ chunks — short policy/FAQ sentences a phone receptionist would use to answer caller questions about this business.
+
+Return valid JSON with the schema provided.
+chunks: up to 20 FAQ/policy sentences a phone receptionist would use to answer caller questions.`;
+}
+
+/**
+ * Builds a small, focused suggestion prompt for the guided form's autocomplete.
+ * Two modes:
+ *  - businessType → one short normalized type label completing the partial text.
+ *  - services → up to 6 likely service names for the business type, excluding any
+ *    already listed.
+ */
+export function buildSuggestPrompt(input: {
+  field: "businessType" | "services";
+  companyName?: string;
+  businessType?: string;
+  partial?: string;
+  existing?: string[];
+}): string {
+  const company = input.companyName?.trim() || "this business";
+
+  if (input.field === "businessType") {
+    const partial = input.partial?.trim() || "";
+    return `Suggest ONE short, normalized business-type label (e.g. "Dental clinic", "Coffee shop", "Law firm") that best completes or normalizes the partial text "${partial}" for a business named "${company}".
+Return only the single label, nothing else.`;
+  }
+
+  const businessType = input.businessType?.trim() || "this kind of business";
+  const existing = (input.existing ?? []).map((s) => s.trim()).filter(Boolean);
+  const existingBlock =
+    existing.length > 0
+      ? `Exclude any of these services that are already listed (do not repeat them):
+${existing.map((s) => `- ${s}`).join("\n")}`
+      : `No services are listed yet.`;
+
+  return `Suggest up to 6 likely service names that "${company}", a ${businessType}, would offer.
+${existingBlock}
+Use short noun phrases (e.g. "Teeth cleaning", "Cavity filling"). Return only the service names.`;
+}
+
+/**
  * Converts HTML to plain text.
  */
 export function htmlToText(html: string): string {

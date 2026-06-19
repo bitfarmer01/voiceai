@@ -73,7 +73,7 @@ function AgentStageImpl({
           {live ? (agentSpeaking ? "Receptionist speaking…" : STATUS_LABEL.live) : STATUS_LABEL[status]}
         </p>
         {status === "idle" && (
-          <p className="mt-1 font-mono text-[11px] text-muted-foreground">Pick a business, then press Talk</p>
+          <p className="mt-1 font-mono text-[11px] text-muted-foreground">Press the call button to start</p>
         )}
       </div>
     </div>

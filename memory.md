@@ -1,16 +1,118 @@
 # Memory — Signal Bold UI + BYOD/appointment + Phase 3 telemetry
 
-Last updated: 2026-06-18 (APoSD audit + FULL remediation — ~18 findings over 3 waves, uncommitted; verified: typecheck 0 · 237 tests · 0 new lint) · Branch: `feature/byod-try-page`
+Last updated: 2026-06-19 (`/try` rebuilt into a guided, opinionated journey — smart LLM form, UNCOMMITTED) · Branch: `feature/owner-reposition`
 
-> ⚠️ **Two gotchas that bite first:**
-> 1. **Committed vs uncommitted on this branch.** Already committed (ahead of `main`): Phase 3 telemetry
->    (`1e62781`) + BYOD (`b77d97f`→`35e1d30`). Still **uncommitted** in the working tree: Signal Bold UI
->    (Phase 1+2), the appointment/booking UI, the call-end fix, the providerStats / use-vapi-call hardening,
->    the dummy-data cleanup, the docs streamlining + audit, and the **leaderboard redesign** (incl. the
->    `git rm` of `latency-cost-chart.tsx`). Decide whether to split the uncommitted streams into separate commits.
-> 2. **Convex dev deployment is AHEAD of `main`** (main lacks Phase 3 telemetry, commit `1e62781`).
->    Deploying main or a pre-Phase-3 branch to it reintroduces `ArgumentValidationError` on
->    `telemetry.batchWriteSpans`. Keep `convex dev` running; whatever merges MUST include `1e62781`.
+> ⚠️ **Repo state (post-consolidation, 2026-06-19) — the old "uncommitted streams" gotchas are GONE:**
+> 1. **One branch is the source of truth:** `feature/owner-reposition` (local + `origin` in sync at `cd093d9`).
+>    EVERYTHING is committed — all prior uncommitted streams (Signal Bold UI, BYOD, call-end fix, dummy-data
+>    cleanup, leaderboard, APoSD remediation, owner-reposition, receptionist fix) are in its history.
+> 2. **`main` is KEPT but BEHIND** at `7cf732e` — it does NOT have the consolidated work. **Next housekeeping
+>    step:** fast-forward `main` to `feature/owner-reposition` OR set the feature branch as the GitHub default.
+> 3. **All other branches were DELETED (local + remote):** `feature/byod-and-signal-bold-ui`, `feature/byod-try-page`,
+>    `phase1/2/3-*`, `worktree-agent-*`, `worktree-ws0.5-*`, `ws1-ui-feature-build`. Tips recoverable from local
+>    reflog ~90d (e.g. `byod-try-page` `ad276b0`, `phase3` `1e62781`, `ws1` `1331dcd`); remote copies are gone.
+> 4. **Convex:** dev DB was re-seeded CLEAN (presets only, zero fabricated calls/stats/budget). Keep `convex dev`
+>    running; the consolidated commit includes Phase-3 telemetry so the dev deploy is not regressed.
+
+## `/try` rebuilt into a guided, opinionated journey (2026-06-19, UNCOMMITTED)
+
+Replaced the flat 3-column `/try` (whose "My business" tab dumped users into 4 cold equal tabs —
+Upload/Paste/Link/Form) with a **guided stage machine**. Brainstormed via the visual companion (mockups in
+`.superpowers/brainstorm/54037-*/content/`); spec/plan `~/.claude/plans/i-want-to-refine-wobbly-hoare.md`.
+Built by me + a `convex-expert` subagent (backend), live-verified with Playwright.
+
+**Journey (`app/(site)/try/page.tsx` is now a thin machine):** `entry` → `demo-call` (Glow Dental) →
+`demo-recap` → `form` → `your-call` → `your-recap`. Entry fork = "Hear a quick demo" / "Build my
+receptionist". The finished-call recap is **derived during render** from `call.status==="ended"` (NOT a
+setState-in-effect — that lint rule bit me; deriving also makes "call again" just work).
+
+**New files:** `components/try/stages/{entry-fork,call-stage,guided-form,other-ways,recap}.tsx` +
+`lib/vapi/use-try-call.ts` (owns ALL call orchestration: `useVapiCall` + startCall/attach/end + booking
+subscription + `beginDemo`/`beginBusiness`; stages are presentational). **Deleted** orphaned
+`components/try/business-form.tsx`. **Reused as-is:** `AgentStage` (already had live `VoiceVisualizer` +
+calm ended-disc — craft-sweep Stream 3 was already done/committed), `CallController`, `AppointmentCard`,
+guard/budget panels, `ConsentDialog`, `<TechnicalOnly>`.
+
+**The smart guided form (centerpiece) — fields chosen by working backwards from the VAPI assistant input
+(`buildAssistantFromConvexBusiness` consumes `{companyName,hours,services[],policies[],availability}`+chunks;
+`services` feeds the prompt AND the check_availability/book_appointment tools):** owner supplies only
+**name + business type + services (≤5)**; the LLM drafts hours/policies/availability/FAQ; owner reviews/edits
+(services chips, hours, how-you-book) before anything is stored. Two assists: a **"Draft my receptionist"**
+button + **5s-idle** live suggestions (ghost-text for type, Tab-accept; tap-to-add chips for services).
+"Other ways →" disclosure reuses paste/upload/link → `getWithChunks` → call (no review step).
+
+**Backend (`convex/sources.ts`, all `"use node"`; `convex/lib/ingest_helpers.ts`, TDD 92/92):**
+- `generateDraftProfile` — `{companyName,businessType,services[]}` → full profile, **does NOT insert**.
+- `createBusinessFromProfile` — sanitize the owner-edited profile → `ctx.runMutation(internal.businesses.insertUploadedBusiness)`.
+  ⚠️ Built as a **`"use node"` action in sources.ts**, NOT a mutation in businesses.ts — `sanitizeProfile`
+  lives in the `"use node"` `ingest_helpers.ts` and a V8 mutation can't import it. `businesses.ts` untouched.
+- `suggestField` — lightweight; `{suggestion?}|{suggestions?}`; returns `{}` on any failure (never breaks the form).
+- helpers: `buildFormDraftPrompt`, `clampDraftInput` (cap services 5), `buildSuggestPrompt`.
+
+**Call screen:** clean single-focus; a **local "Show details" toggle** reveals slim insights (spending +
+neutral `ShieldCheck` reassurance chips). The deep lab (`PipelineSelector`) stays behind the **global
+Technical mode** (`<TechnicalOnly>`) — two distinct toggles, not redundant.
+
+**Verified:** `pnpm typecheck` 0 · `pnpm test` **258/258** · lint = baseline (the 2 setState-in-effect errors
+I introduced were fixed; remaining ~12 are pre-existing). **LIVE Playwright smoke (localhost:3000, real VAPI
+calls, 0 console errors):** build branch — ghost "Dental clinic" (Tab), service chips, draft preserved+expanded
+services + drafted hours/booking, create → live call greeting "Thanks for calling Lakeside Dental" → recap with
+real `/calls/<id>` link; demo branch — Glow Dental greeting; Show-details slim insights; light + dark.
+**Status: UNCOMMITTED** (new `stages/` + `use-try-call.ts` untracked; `page.tsx`/`agent-stage`/`call-controller`/
+`sources.ts`/`ingest_helpers.ts` modified; `business-form.tsx` deleted).
+
+## Receptionist behavior fix + repo consolidation (2026-06-19, COMMITTED)
+
+Ran `/review` on receptionist BEHAVIOR (not UI) for 3 reported symptoms — **topic relevance, schedule/calendar
+adherence, accuracy** — found 11 findings, then "comprehensively fixed all" via a 2-stream Workflow + an
+adversarial probe + my integration. Then consolidated the whole repo.
+
+**Root cause of the schedule bug:** business hours were **free text, never parsed**. So `check_availability`
+returned fixed fictional slots (only Sunday hardcoded closed) and `book_appointment` validated NOTHING (booked
+any slot verbatim — closed days, past dates, outside hours).
+
+**What was built (committed in `c3d89fa`, the cleanly-separable core):**
+- **NEW `convex/lib/hours.ts`** — pure V8-safe parser: free-text weekly hours → `{0..6 → {openMin,closeMin}|null}`.
+  Exports `parseHours / isOpenOn / isWithinHours / slotsFor / describeDay / parseTimeToken / toHHMM`. Handles day
+  RANGES (`-`/`to`), LISTS (`and`/`&`/comma via a pending-day buffer), am/pm + 24h times, "by appointment"
+  (modality, not closure), `24/7`. Returns `null` → callers **degrade-open with a transparent note** (BYOD never
+  worse). NEW `convex/lib/hours.test.ts` (40 cases, all 3 presets in am/pm + 24h).
+- **`convex/tools.ts` rewrite** — `checkAvailability` = real open/closed days + slots within the actual window;
+  `bookAppointment` = rejects past/closed-day/outside-window slots (persists NOTHING), books only valid ones.
+  FROZEN `_contracts.ts` shapes UNCHANGED (reject via `booked:false`+message). `convex/tools.test.ts` extended.
+
+**What was built (verified + committed in the consolidation `cd093d9`, NOT in `c3d89fa` — see below):**
+- **`lib/vapi/assistant.ts` prompt + `app/(site)/try/page.tsx` wiring** — date anchor ("Today is …", passed from
+  `/try`), check-availability-before-book rule, `lookup_knowledge` grounding instruction, scoped refusal naming
+  the business, **temperature 0.4 → 0.2**, and `SITE_URL || window.location.origin` tool-URL fallback (+ honest
+  localhost warn). NEW `lib/vapi/assistant.test.ts` asserts these prompt invariants.
+
+**Problems solved this session:**
+- **Adversarial probe caught 5 real bugs MY fix introduced** (a workflow Verify phase): "Monday to Friday" parsed
+  as only Monday (critical), am/pm slot times without a colon silently dropped (bypassed the hours check),
+  same-day date-only bookings wrongly rejected as past, `and`/`&`/comma day lists, and `24/7`. **All patched** in
+  `hours.ts`/`tools.ts` + regression tests. Lesson: free-text hour parsing needs an adversarial pass.
+- **Concurrent-session collision:** another session's APoSD F3/F5 refactor (`assembleAssistant` + nested business
+  `profile`) edited `lib/vapi/assistant.ts`/`try/page.tsx` at the same time. My prompt changes SURVIVED; I only had
+  to update my test's mock `biz` from flat → nested `profile`. Their `matchQuery`/`async-section.tsx` (P7) briefly
+  broke the vitest typecheck mid-edit, then went green.
+
+**Consolidation (done this session, COMMIT `cd093d9`):** committed the ENTIRE working tree (APoSD batch + my
+prompt/wiring fixes, 49 files) onto `feature/owner-reposition`, pushed it, then **deleted all 8 other local
+branches and the 6 remote ones** (see gotcha #2-#3 above). `.superpowers/` scratch left untracked.
+
+**Current state:** `pnpm typecheck` clean · **237/237 tests** · everything committed. The receptionist now
+validates against real hours and the prompt is hardened.
+
+**Next session starts with — THE one open verification:** a **live `/try` voice call** to confirm end-to-end the
+model actually (a) respects hours when offering/booking, (b) stays on topic, (c) grounds answers. Logic + prompt
+are test-verified, but model behavior on a real WebRTC call is NOT automatable — needs a human mic test. Try
+booking a closed-day/after-hours slot and asking an off-topic question. (Also pending from prior: live booking
+that triggers `book_appointment` to confirm the appointment card renders mid-call.)
+
+**Open questions:** (1) finish branch housekeeping — fast-forward `main` or set the feature branch as GitHub
+default? (2) structured-hours-at-ingest (parse once into a schema field) instead of parse-on-read — a follow-up,
+not blocking. (3) comma day-lists with BARE hours like "9-5" (no am/pm) still degrade-open (ambiguous) — fine.
 
 ## APoSD design audit + first remediation batch (2026-06-18, uncommitted)
 

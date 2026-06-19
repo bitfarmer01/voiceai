@@ -105,7 +105,7 @@ export function CallController({
       </div>
       )}
 
-      {status === "idle" && <p className="text-xs text-muted-foreground">A quick demo call · we ask for your mic once</p>}
+      {status === "idle" && <p className="text-xs text-muted-foreground">We&apos;ll ask for your mic once</p>}
 
       {status === "ended" && (
         // One primary next action (the report — this demo's payoff) plus a quiet
