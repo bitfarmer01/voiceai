@@ -23,12 +23,15 @@ const MAX_TEXT_CHARS = 50_000;
  * Shared extraction + insert pipeline used by every ingest source.
  * Runs the NIM structured-extraction call against the given prompt, sanitizes the
  * resulting profile, and inserts the uploaded business. Only the prompt differs
- * between sources (document extraction vs. form expansion).
+ * between sources (document extraction vs. form expansion). Document sources also
+ * pass `sourceMeta` (the storage handle + original filename/mime) so it is recorded
+ * on the inserted business; text/URL/form sources omit it.
  */
-async function extractAndInsert(
+export async function extractAndInsert(
   ctx: ActionCtx,
   sessionId: string,
   prompt: string,
+  sourceMeta?: { storageId?: Id<"_storage">; fileName?: string; mimeType?: string },
 ): Promise<{ businessId: Id<"businesses"> }> {
   const { createOpenAI } = await import("@ai-sdk/openai");
   const { generateObject } = await import("ai");
@@ -49,6 +52,7 @@ async function extractAndInsert(
 
   const businessId = await ctx.runMutation(internal.businesses.insertUploadedBusiness, {
     sessionId,
+    ...(sourceMeta ?? {}),
     ...sanitized,
   });
 

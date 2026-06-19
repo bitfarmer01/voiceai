@@ -47,7 +47,7 @@ function AgentStageImpl({
 
       <div className="relative flex items-center justify-center">
         {connecting && (
-          <span className="absolute size-32 animate-pulse-ring rounded-full bg-primary/40" />
+          <span className="pointer-events-none absolute inset-0 m-auto size-32 animate-pulse-ring rounded-full bg-primary/40" />
         )}
         {ended ? (
           // Settled "done" state — a calm neutral disc, not the live orb left

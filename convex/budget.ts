@@ -78,6 +78,46 @@ export async function decActiveHelper(ctx: MutationCtx): Promise<void> {
   await ctx.db.patch(row._id, { activeCalls: Math.max(0, row.activeCalls - 1) });
 }
 
+// ── Per-call idempotent finalization helpers ────────────────────────────────────
+// Cost-record and concurrency-release are finalized from TWO call sites that can
+// fire in any order (lifecycle.endCall on client teardown, calls.recordEndOfCall
+// on the VAPI webhook). A single status flag wrongly conjoins two facts that need
+// OPPOSITE handling on a second pass. These markers make each fact independently
+// idempotent: the marker is read off the call doc (its DB state before this
+// mutation) and patched on first action, so a second pass — in either order — is
+// a no-op. Within one mutation transaction, patching the marker alongside the
+// caller's own patch of the same doc is fine.
+
+/**
+ * Release the call's concurrency slot exactly once. No-op if already released.
+ * `call` is the doc as read at the top of the calling handler.
+ */
+export async function releaseConcurrencyOnce(
+  ctx: MutationCtx,
+  call: Doc<"calls">,
+): Promise<void> {
+  if (call.concurrencyReleased) return;
+  await decActiveHelper(ctx);
+  await ctx.db.patch(call._id, { concurrencyReleased: true });
+}
+
+/**
+ * Record the call's reported cost exactly once. No-op if already recorded.
+ * `usd` is the authoritative reported cost; `day` is the YYYY-MM-DD bucket it
+ * belongs to (the caller passes the call's own day so a midnight-crossing call
+ * accounts to the day it started).
+ */
+export async function recordCostOnce(
+  ctx: MutationCtx,
+  call: Doc<"calls">,
+  usd: number,
+  day: string,
+): Promise<void> {
+  if (call.costRecorded) return;
+  await addCostHelper(ctx, usd, day);
+  await ctx.db.patch(call._id, { costRecorded: true });
+}
+
 export const getPublicState = query({
   args: {},
   returns: v.object({

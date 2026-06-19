@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Waveform, List } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
-import { OWNER_NAV, TECHNICAL_NAV, type NavItem } from "@/lib/nav";
+import { OWNER_NAV, TECHNICAL_NAV, TECHNICAL_NAV_LABEL, type NavItem } from "@/lib/nav";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
@@ -68,7 +68,7 @@ function MobileNavLink({
 function BehindTheScenesDivider() {
   return (
     <span className="ml-2 mr-1 select-none text-[0.6875rem] font-medium uppercase tracking-wide text-muted-foreground/70">
-      Behind the scenes
+      {TECHNICAL_NAV_LABEL}
     </span>
   );
 }
@@ -143,7 +143,7 @@ export function SiteHeader() {
                 ))}
                 <TechnicalOnly>
                   <span className="mx-3 mb-1 mt-3 select-none text-[0.6875rem] font-medium uppercase tracking-wide text-muted-foreground/70">
-                    Behind the scenes
+                    {TECHNICAL_NAV_LABEL}
                   </span>
                   {TECHNICAL_NAV.map((item) => (
                     <MobileNavLink
@@ -156,7 +156,7 @@ export function SiteHeader() {
                 </TechnicalOnly>
                 <div className="mx-2 mt-3 flex items-center gap-2">
                   <ViewModeToggle />
-                  <span className="text-sm text-muted-foreground">Behind the scenes</span>
+                  <span className="text-sm text-muted-foreground">{TECHNICAL_NAV_LABEL}</span>
                 </div>
                 <Button asChild className="mt-3 mx-2" onClick={closeMenu}>
                   <Link href="/try">Talk to a receptionist</Link>

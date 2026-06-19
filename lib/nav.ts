@@ -23,3 +23,6 @@ export const TECHNICAL_NAV: readonly NavItem[] = [
   { href: "/evals", label: "Evals" },
   { href: "/analytics", label: "Analytics" },
 ] as const;
+
+/** Label that introduces the technical nav group (single source of truth). */
+export const TECHNICAL_NAV_LABEL = "Behind the scenes";

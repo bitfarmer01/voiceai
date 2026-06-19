@@ -17,7 +17,7 @@ import type {
   ProviderKind,
   ProviderStat,
 } from "@/lib/types";
-import { MOCK_PROVIDERS } from "@/lib/data/mock";
+import { PROVIDER_CATALOG } from "@/lib/data/providers-catalog";
 
 const FALLBACK_BUDGET: BudgetState = {
   totalSpentUsd: 0,
@@ -30,14 +30,6 @@ const FALLBACK_BUDGET: BudgetState = {
 
 export function useBudgetState(): BudgetState {
   return useQuery(api.budget.getPublicState) ?? FALLBACK_BUDGET;
-}
-
-export function useActiveCallCount(): number {
-  return useQuery(api.calls.activeCount) ?? 0;
-}
-
-export function useCallsToday(): number {
-  return useQuery(api.calls.countToday) ?? 0;
 }
 
 /** `undefined` while loading · `[]` when there are genuinely no calls yet. */
@@ -57,5 +49,5 @@ export function useProviderStats(
 }
 
 export function useProviders(kind?: ProviderKind): Provider[] {
-  return kind ? MOCK_PROVIDERS.filter((p) => p.kind === kind) : MOCK_PROVIDERS;
+  return kind ? PROVIDER_CATALOG.filter((p) => p.kind === kind) : PROVIDER_CATALOG;
 }

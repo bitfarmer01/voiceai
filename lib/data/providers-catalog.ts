@@ -1,11 +1,11 @@
 /**
  * The selectable CATALOG of voices/options backing the data seam (lib/data/index.ts).
  * This is configuration — the set of providers a user can pick — NOT measured usage.
- * No fabricated metrics live here. Screens import the hooks, never this fixture directly.
+ * No fabricated metrics live here. Screens import the hooks, never this catalog directly.
  */
 import type { Provider } from "@/lib/types";
 
-export const MOCK_PROVIDERS: Provider[] = [
+export const PROVIDER_CATALOG: Provider[] = [
   { id: "deepgram-flux", name: "Deepgram Flux", kind: "stt", source: "native", costPerMin: 0.006, languages: ["en", "es"] },
   { id: "assemblyai", name: "AssemblyAI", kind: "stt", source: "native", costPerMin: 0.007, languages: ["en"] },
   { id: "fal-whisper", name: "Fal.ai Whisper", kind: "stt", source: "custom", costPerMin: 0.004, languages: ["en", "es", "fr"] },

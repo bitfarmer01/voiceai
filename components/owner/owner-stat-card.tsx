@@ -1,5 +1,6 @@
 import type { Icon } from "@phosphor-icons/react";
 import { Card, CardContent } from "@/components/ui/card";
+import { formatCount } from "@/lib/format";
 
 /**
  * OwnerStatCard — one plain-language headline number for the owner Overview.
@@ -35,7 +36,7 @@ export function OwnerStatCard({
           <span className="text-sm font-medium text-pretty">{label}</span>
         </div>
         <p className="font-heading text-3xl font-semibold tabular-nums leading-none">
-          {value.toLocaleString()}
+          {formatCount(value)}
         </p>
         {hint && <p className="text-xs text-pretty text-muted-foreground">{hint}</p>}
       </CardContent>

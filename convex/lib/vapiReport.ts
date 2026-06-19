@@ -15,36 +15,10 @@
  * PURE: no Date.now()/Math.random(), no IO. Date.parse(string) is deterministic.
  */
 import type { EngineEndOfCallReport, EngineKind } from "../_contracts";
+// Shared VAPI *server webhook* envelope readers — single owner is vapiWire.ts.
+import { num, pick, str, unwrapMessage } from "./vapiWire";
 
 const ENGINE: EngineKind = "vapi";
-
-function pick(obj: unknown, ...path: string[]): unknown {
-  let cur: unknown = obj;
-  for (const key of path) {
-    if (cur && typeof cur === "object" && key in (cur as Record<string, unknown>)) {
-      cur = (cur as Record<string, unknown>)[key];
-    } else {
-      return undefined;
-    }
-  }
-  return cur;
-}
-
-function num(x: unknown): number | undefined {
-  const n = typeof x === "string" ? Number(x) : x;
-  return typeof n === "number" && Number.isFinite(n) ? n : undefined;
-}
-
-function str(x: unknown): string | undefined {
-  return typeof x === "string" ? x : undefined;
-}
-
-function unwrapMessage(body: unknown): Record<string, unknown> {
-  const msg = pick(body, "message");
-  if (msg && typeof msg === "object") return msg as Record<string, unknown>;
-  if (body && typeof body === "object") return body as Record<string, unknown>;
-  return {};
-}
 
 /** Reduce message.costs[] by type into a {stt,llm,tts,platform} breakdown. */
 function costsBreakdown(msg: Record<string, unknown>): {

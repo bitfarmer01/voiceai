@@ -38,11 +38,13 @@ export const getWithChunks = query({
     v.object({
       _id: v.id("businesses"),
       name: v.string(),
-      companyName: v.string(),
-      hours: v.string(),
-      services: v.array(v.string()),
-      policies: v.array(v.string()),
-      availability: v.string(),
+      profile: v.object({
+        companyName: v.string(),
+        hours: v.string(),
+        services: v.array(v.string()),
+        policies: v.array(v.string()),
+        availability: v.string(),
+      }),
       chunks: v.array(v.object({ text: v.string(), tags: v.array(v.string()) })),
     }),
   ),
@@ -56,11 +58,13 @@ export const getWithChunks = query({
     return {
       _id: biz._id,
       name: biz.name,
-      companyName: biz.profile.companyName,
-      hours: biz.profile.hours,
-      services: biz.profile.services,
-      policies: biz.profile.policies,
-      availability: biz.profile.availability,
+      profile: {
+        companyName: biz.profile.companyName,
+        hours: biz.profile.hours,
+        services: biz.profile.services,
+        policies: biz.profile.policies,
+        availability: biz.profile.availability,
+      },
       chunks: chunks.map((c) => ({ text: c.text, tags: c.tags })),
     };
   },

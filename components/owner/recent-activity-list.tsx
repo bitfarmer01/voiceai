@@ -1,6 +1,5 @@
 "use client";
 
-import * as React from "react";
 import Link from "next/link";
 import {
   CalendarCheck,
@@ -10,6 +9,7 @@ import {
   type Icon,
 } from "@phosphor-icons/react";
 import { formatDuration } from "@/lib/format";
+import { useTimeAgo } from "@/lib/hooks/use-time-ago";
 
 /** One row as the owner Overview cares about it (mirrors ownerStats.summary). */
 export interface ActivityItem {
@@ -20,7 +20,15 @@ export interface ActivityItem {
   result: "booked" | "messageLeft" | "noMessage";
 }
 
-/** Plain-English framing of each result — owner words, no jargon. */
+/**
+ * Plain-English framing of each result — owner words, no jargon.
+ *
+ * Intentionally NOT the shared `lib/calls/outcome` (CALL_OUTCOME) map: this keys on a
+ * DIFFERENT enum (`result`: booked / messageLeft / noMessage) from a different source
+ * (api.ownerStats.summary) at a coarser granularity — "noMessage" ("Answered a call")
+ * is not the same as CallOutcome's "abandoned" ("Answered a question"). Forcing them
+ * onto one map would change what the Overview communicates, so they diverge by design.
+ */
 const RESULT: Record<
   ActivityItem["result"],
   { icon: Icon; iconClass: string; label: string }
@@ -41,23 +49,6 @@ const RESULT: Record<
     label: "Answered a call",
   },
 };
-
-/** Stable, hydration-safe "x min ago" — computed only after mount. */
-function useTimeAgo(startedAt: number): string {
-  const [now, setNow] = React.useState<number | null>(null);
-  React.useEffect(() => {
-    setNow(Date.now());
-  }, []);
-  if (now === null) return "";
-  const diff = now - startedAt;
-  const m = Math.floor(diff / 60_000);
-  if (m < 1) return "just now";
-  if (m < 60) return `${m} min ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h} hr ago`;
-  const d = Math.floor(h / 24);
-  return d === 1 ? "yesterday" : `${d} days ago`;
-}
 
 function ActivityRow({ item }: { item: ActivityItem }) {
   const r = RESULT[item.result];

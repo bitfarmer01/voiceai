@@ -6,9 +6,8 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { CallStatusBadge } from "@/components/shared/status-badge";
 import { formatDuration } from "@/lib/format";
-import type { CallStatus } from "@/lib/types";
-
-const MAX = 120;
+import { callIsBusy, type CallStatus } from "@/lib/types";
+import { BUDGET } from "@/convex/_contracts";
 
 /**
  * CallController — Talk/End with a 120s countdown ring, mute toggle, and the frozen
@@ -34,8 +33,8 @@ export function CallController({
   onEnd: () => void;
   onToggleMute: () => void;
 }) {
-  const active = status === "live" || status === "connecting";
-  const ringPct = secondsLeft / MAX;
+  const active = callIsBusy(status);
+  const ringPct = secondsLeft / BUDGET.MAX_CALL_SECONDS;
   const R = 34;
   const C = 2 * Math.PI * R;
 

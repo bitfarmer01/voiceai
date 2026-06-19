@@ -3,14 +3,15 @@
 import * as React from "react";
 import Link from "next/link";
 import { useQuery, useMutation } from "convex/react";
-import { ArrowLeft, CalendarCheck, ChatCircle, Question } from "@phosphor-icons/react";
+import { ArrowLeft } from "@phosphor-icons/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
-import { formatUsd, formatDuration, formatMs } from "@/lib/format";
+import { formatUsd, formatDuration, formatMs, formatDateTime } from "@/lib/format";
 import { bookingFromStructuredData } from "@/lib/calls/booking";
+import { CALL_OUTCOME } from "@/lib/calls/outcome";
+import { spansToWaterfallTurns } from "@/lib/calls/trace";
 import { AppointmentCard } from "@/components/shared/appointment-card";
 import { TraceWaterfall } from "@/components/shared/trace-waterfall";
-import type { WaterfallTurn } from "@/components/shared/trace-waterfall";
 import { CostBreakdown } from "@/components/shared/cost-breakdown";
 import { QualityMetricsPanel } from "@/components/shared/quality-metrics";
 import { CallTimeline } from "@/components/shared/call-timeline";
@@ -19,76 +20,7 @@ import { EmptyState } from "@/components/states/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TechnicalOnly } from "@/lib/view-mode";
 import { useVisitorKey } from "@/lib/hooks/use-visitor-key";
-import type { SpanKind, TranscriptTurn, CallOutcome } from "@/lib/types";
-
-// Plain-language framing of the outcome — what the call accomplished, in a
-// shop owner's words. No provider names, no jargon.
-const OUTCOME: Record<
-  CallOutcome,
-  { icon: React.ElementType; iconClass: string; headline: string; wanted: string }
-> = {
-  booked: {
-    icon: CalendarCheck,
-    iconClass: "text-success",
-    headline: "Booked an appointment",
-    wanted: "The caller wanted to schedule a visit.",
-  },
-  intent: {
-    icon: ChatCircle,
-    iconClass: "text-primary",
-    headline: "Took a message",
-    wanted: "The caller wanted to get in touch and left their details.",
-  },
-  abandoned: {
-    icon: Question,
-    iconClass: "text-muted-foreground",
-    headline: "Answered a question",
-    wanted: "The caller asked about the business.",
-  },
-};
-
-function spansToWaterfallTurns(
-  spans: Array<{ kind: string; label: string; startMs: number; endMs: number; durationMs: number }>,
-): WaterfallTurn[] {
-  // Group spans by turn — spans with kind "turn" define turn boundaries;
-  // child spans (stt/llm/tts/tool) are nested under them.
-  // If no "turn" spans exist, treat all spans as one turn.
-  const turnSpans = spans.filter((s) => s.kind === "turn");
-  if (turnSpans.length === 0 && spans.length > 0) {
-    const total = Math.max(...spans.map((s) => s.endMs)) - Math.min(...spans.map((s) => s.startMs));
-    const ttfw = spans.find((s) => s.kind === "stt")?.durationMs ?? 0;
-    return [
-      {
-        idx: 1,
-        spans: spans.map((s) => ({
-          kind: s.kind as SpanKind,
-          label: s.label,
-          startMs: s.startMs,
-          durationMs: s.durationMs,
-        })),
-        ttfwMs: ttfw,
-        totalMs: total,
-      },
-    ];
-  }
-  return turnSpans.map((t, i) => {
-    const children = spans.filter(
-      (s) => s.kind !== "turn" && s.startMs >= t.startMs && s.endMs <= t.endMs,
-    );
-    const ttfw = children.find((s) => s.kind === "stt")?.durationMs ?? 0;
-    return {
-      idx: i + 1,
-      spans: children.map((s) => ({
-        kind: s.kind as SpanKind,
-        label: s.label,
-        startMs: s.startMs,
-        durationMs: s.durationMs,
-      })),
-      ttfwMs: ttfw,
-      totalMs: t.durationMs,
-    };
-  });
-}
+import type { TranscriptTurn, CallOutcome } from "@/lib/types";
 
 export function CallReportClient({ id }: { id: string }) {
   const callId = id as Id<"calls">;
@@ -116,8 +48,8 @@ export function CallReportClient({ id }: { id: string }) {
     await rateMutation({
       callId,
       stars,
-      ttsProvider: (call as { ttsProvider?: string }).ttsProvider ?? "",
-      ttsVoice: (call as { ttsVoice?: string }).ttsVoice,
+      ttsProvider: call.ttsProvider,
+      ttsVoice: call.ttsVoice,
       visitorKey: visitorKey || undefined,
     });
     setRateSubmitted(true);
@@ -147,38 +79,12 @@ export function CallReportClient({ id }: { id: string }) {
     );
   }
 
-  const c = call as {
-    _id: string;
-    businessName: string;
-    status: string;
-    outcome?: string;
-    durationSec: number;
-    costUsd: number;
-    costBreakdown: { stt: number; llm: number; tts: number; platform: number };
-    sttProvider: string;
-    ttsProvider: string;
-    ttsVoice?: string;
-    llmProvider: string;
-    languages: string[];
-    startedAt: number;
-    ttfwMs?: number;
-    summary?: string;
-    structuredData?: unknown;
-    qualityMetrics?: {
-      talkRatio: number;
-      interruptions: number;
-      deadAirSec: number;
-      wpm: number;
-      sentiment?: number;
-    };
-  };
+  // `call` is the typed non-PII projection from api.calls.getById (one owner of the
+  // report shape); no hand-maintained cast needed.
+  const c = call;
 
-  const outcomeKey = (["booked", "intent", "abandoned"] as const).includes(
-    c.outcome as CallOutcome,
-  )
-    ? (c.outcome as CallOutcome)
-    : "abandoned";
-  const o = OUTCOME[outcomeKey];
+  const outcomeKey: CallOutcome = c.outcome ?? "abandoned";
+  const o = CALL_OUTCOME[outcomeKey];
   const OutcomeIcon = o.icon;
 
   const waterfallTurns = spansToWaterfallTurns(spans ?? []);
@@ -209,7 +115,7 @@ export function CallReportClient({ id }: { id: string }) {
         <div className="min-w-0">
           <h1 className="text-xl font-bold text-balance">{o.headline}</h1>
           <p className="mt-0.5 text-sm text-muted-foreground">
-            {c.businessName} · {new Date(c.startedAt).toLocaleString()}
+            {c.businessName} · {formatDateTime(c.startedAt)}
           </p>
         </div>
       </div>
@@ -218,7 +124,7 @@ export function CallReportClient({ id }: { id: string }) {
         {/* What happened — the owner's headline takeaway */}
         <section className="rounded-xl border bg-card p-5">
           <h2 className="mb-2 text-sm font-semibold">What happened</h2>
-          <p className="text-sm text-muted-foreground">{o.wanted}</p>
+          <p className="text-sm text-muted-foreground">{o.summary}</p>
           {c.summary ? (
             <p className="mt-3 text-sm text-pretty text-foreground leading-relaxed">{c.summary}</p>
           ) : (

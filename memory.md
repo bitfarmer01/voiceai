@@ -1,6 +1,6 @@
 # Memory — Signal Bold UI + BYOD/appointment + Phase 3 telemetry
 
-Last updated: 2026-06-18 (owner-first repositioning — APPROVED PLAN, awaiting go-ahead) · Branch: `feature/byod-try-page`
+Last updated: 2026-06-18 (APoSD audit + FULL remediation — ~18 findings over 3 waves, uncommitted; verified: typecheck 0 · 237 tests · 0 new lint) · Branch: `feature/byod-try-page`
 
 > ⚠️ **Two gotchas that bite first:**
 > 1. **Committed vs uncommitted on this branch.** Already committed (ahead of `main`): Phase 3 telemetry
@@ -11,6 +11,90 @@ Last updated: 2026-06-18 (owner-first repositioning — APPROVED PLAN, awaiting 
 > 2. **Convex dev deployment is AHEAD of `main`** (main lacks Phase 3 telemetry, commit `1e62781`).
 >    Deploying main or a pre-Phase-3 branch to it reintroduces `ArgumentValidationError` on
 >    `telemetry.batchWriteSpans`. Keep `convex dev` running; whatever merges MUST include `1e62781`.
+
+## APoSD design audit + first remediation batch (2026-06-18, uncommitted)
+
+Ran a strategic "A Philosophy of Software Design" audit over the whole app (backend call-pipeline read
+directly; presentation layer via 4 parallel subagents against the red-flag catalog), then EXECUTED the 5
+highest-value findings (2 carry real bugs) via subagents + integration. ✅ `pnpm typecheck` 0 errors ·
+**180/180 tests** (was 169; +6 F2 + 5 timeAgo) · **0 NEW lint** (12 pre-existing remain; every touched file
+is lint-clean). Full audit report (backend F1–F9 + presentation P1–P9 + combined plan) is in this session's
+transcript. NOTE: `convex codegen` during verification did a dev push of the local functions — harmless (the
+working tree already includes Phase-3 telemetry, so the dev deploy is not regressed).
+
+**The audit CORRECTED 3 stale assumptions in this file / the craft-sweep plan (verified by reading files):**
+- The shadcn `ring-1 ring-foreground/10` depth tell is ALREADY gone everywhere (card/select/dialog/dropdown/
+  popover/sheet all use `border border-border` + shadow). Craft-sweep **Stream 2 is effectively DONE — do not redo.**
+- `cost-breakdown.tsx` does NOT misuse the latency scale (it's correctly neutral `bg-foreground/20·35·50·65`).
+  The cost honesty-flag is resolved. The real latency-token misuse was in `trace-waterfall.tsx` (fixed, P6).
+- `trace-waterfall.tsx`'s TTFW number/color (line ~84) is already correct — the old `totalMs` mismatch note is stale.
+
+**Shipped fixes (uncommitted):**
+- **F2 — split-brain call finalization (REAL BUG, fixed + TDD'd).** `recordEndOfCall` gated BOTH
+  concurrency-release and cost-add behind one `alreadyEnded` flag; a client-`endCall`-first teardown made the
+  webhook skip `addCost` → the call's cost was silently dropped from `budgetState`. Fix: additive optional
+  markers `concurrencyReleased`/`costRecorded` on the `calls` table + idempotent `releaseConcurrencyOnce` /
+  `recordCostOnce` helpers in `budget.ts`; `lifecycle.endCall` + `calls.recordEndOfCall` both route through them
+  (cost added EXACTLY once in ANY teardown order; concurrency decremented once, never <0; duplicate webhook
+  safe). `endCall` no longer hand-inlines the decrement. New `convex/lifecycle.test.ts` (6 tests; the
+  dropped-cost case failed pre-fix, passes post-fix).
+- **F9 + P3 — typed `getById` seam.** `calls.getById` returned `v.any()`, forcing a 24-line `as {…}` cast in
+  `call-report-client.tsx`. Now returns a typed NON-PII projection (`callReportValidator` / `toCallReport`,
+  excluding sessionId/vapiCallId/visitorKey + the new markers) — closes the overexposure AND kills the cast
+  (client uses the inferred type; `outcomeKey` simplified to `c.outcome ?? "abandoned"`).
+- **P5 — `timeAgo` unified (fixes an SSR hydration bug).** Canonical `lib/format.ts timeAgo(from, now)` was
+  DEAD; two copies diverged and `calls/page.tsx` called `Date.now()` at render → hydration mismatch. Now one
+  pure owner + a hydration-safe `lib/hooks/use-time-ago.ts` (rAF-deferred `setNow`, lint-clean); both callers
+  import it; `calls/page.tsx` extracted a `CallRow` so the hook is called legally per row.
+- **P6 — span-kind color.** `trace-waterfall.tsx` SPAN_CLS stopped aliasing the frozen `bg-latency-good/slow`
+  tokens for stt/llm; now a neutral `bg-foreground/25·45·65` ramp (tool/guardrail keep their categorical colors).
+
+**Deliberately NOT done:** F7 (the 18 `DEBUG(spans)` console logs in `use-vapi-call.ts` + `telemetry.ts`) —
+left IN; they're load-bearing for the still-pending live `/try` smoke test (M3/M5/M6). Silence only after that lands.
+
+**Audit backlog — FULLY EXECUTED in 2 file-disjoint subagent waves + gates (2026-06-18, uncommitted).**
+✅ `pnpm typecheck` 0 errors · **237 tests pass** (0 failures) · lint **12, ZERO new** (all pre-existing: harness
+`any` in calls/ingest tests, leaderboard `<Th>` static-components, theme-toggle/voice-visualizer/use-visitor-key).
+- **Wave 1 (A1/A2/A3):** **F1** — server VAPI webhook envelope parsing → NEW `convex/lib/vapiWire.ts` (shared by
+  http.ts + vapiReport.ts; killed the duplicated `unwrapMessage`/`pick`/`num`/`str`/`extractToolCalls`). Client
+  SDK-message parsing in use-vapi-call.ts deliberately NOT merged (different payload shape + Convex bundles
+  convex/ separately from lib/ — honest scope, documented in vapiWire's header). **F6** — `prop` dup → NEW
+  `lib/unknown.ts` (prop/asString/asNumber); booking.ts + use-vapi-call use it. **F4** — `ingestDocument` reuses a
+  widened `extractAndInsert(ctx, sessionId, prompt, sourceMeta?)`. **F5** — both assistant builders → thin
+  adapters over a private `assembleAssistant` core. **P9-hygiene** — `select.tsx` no-op `&& ""` removed;
+  `TECHNICAL_NAV_LABEL` exported from `lib/nav.ts` (×3 header sites); `mock.ts`→`providers-catalog.ts` +
+  `MOCK_PROVIDERS`→`PROVIDER_CATALOG`; dead `useActiveCallCount`/`useCallsToday` deleted. **Foundations:**
+  `inProgress` on `useVapiCall`, `callIsBusy(status)` in `lib/types.ts`, and the 120s cap unified on
+  `BUDGET.MAX_CALL_SECONDS` (use-vapi-call + assistant `maxDurationSeconds` + call-controller).
+  > GOTCHA (found by agents): a runtime VALUE import of `@/convex/_contracts` (e.g. `BUDGET`) FAILS under vitest
+  > in files that ARE imported by a test (no `@/` alias in vitest.config) — use a RELATIVE path there
+  > (`../../convex/_contracts`). It's fine in non-test-imported files (use-vapi-call hook, call-controller). Same
+  > caveat bit `lib/unknown.ts` in booking.ts → it imports via `../unknown`.
+- **Wave 2 (B1/B2):** **P1** — ONE `lib/calls/outcome.tsx` (`CALL_OUTCOME` map); calls-page/report/admin
+  centralized; dead `OutcomeBadge` DELETED; recent-activity's `result` enum LEFT as-is (option a — genuinely
+  different source/granularity, `noMessage`≠`abandoned`; documented divergence, NOT force-merged). **P4** —
+  `spansToWaterfallTurns` → pure `lib/calls/trace.ts`. **P7** — `matchQuery` (module-scope fn in
+  `components/states/async-section.tsx`) owns the load→empty→data triad across 5 routes; NO error arm (Convex
+  useQuery throws to a boundary, documented). **P8** — `formatDateTime`/`formatCount` added to format.ts; 3 inline
+  `.toLocaleString()` bypasses killed (report/leaderboard/owner-stat-card). **P9-label** — `WaterfallSpan.label`
+  now actually rendered (`s.label ?? SPAN_LABEL[kind]`). **F3** — `getWithChunks` returns NESTED
+  `{ _id, name, profile:{…}, chunks }`; `ConvexBusinessForAssistant` + try/page read `biz.profile.*` (ONE business
+  shape; `insertUploadedBusiness` arg shape unchanged). **P2/F8** — shared `<IngestForm>` under url/text/form
+  inputs (doc-uploader kept as the genuine drag/drop outlier); the 5 `live||connecting` decodings → `call.inProgress`,
+  call-controller `active` → `callIsBusy`.
+- **ONE DELIBERATE visible change (flagged, not silent):** `/admin`'s outcome indicator went color-dot → the
+  shared icon+label (WCAG-safer, single owner); side effect = the `abandoned` tint shifts amber→muted. Revert just
+  that `CALL_OUTCOME.abandoned` color if amber is wanted back on admin.
+- **STILL deferred:** **F7** (the 18 `DEBUG(spans)` logs in use-vapi-call/telemetry) — unchanged, load-bearing for
+  the pending live `/try` smoke test (M3/M5/M6).
+
+**New modules this session:** `convex/lib/vapiWire.ts`, `lib/unknown.ts`, `lib/calls/outcome.tsx`,
+`lib/calls/trace.ts`, `components/states/async-section.tsx`, `lib/hooks/use-time-ago.ts`, `convex/lifecycle.test.ts`,
+`lib/format.test.ts`. Renamed: `lib/data/mock.ts`→`lib/data/providers-catalog.ts`.
+
+> **Everything above is the WHOLE audit — backend F1–F9 + presentation P1–P9 — now DONE except F7.** All
+> uncommitted (consistent with the working tree's pending commit-split decision). The full audit report (red-flag
+> analysis + design-it-twice for the structural items) is in that session's transcript.
 
 ## Owner-first repositioning — BUILT + LIVE-VERIFIED via parallel subagents (2026-06-18, uncommitted)
 

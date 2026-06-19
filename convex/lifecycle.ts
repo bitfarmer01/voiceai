@@ -8,6 +8,7 @@
  */
 import { mutation } from "./_generated/server";
 import { v } from "convex/values";
+import { releaseConcurrencyOnce } from "./budget";
 
 export const endCall = mutation({
   args: {
@@ -31,11 +32,10 @@ export const endCall = mutation({
       outcome: call.outcome ?? "abandoned",
     });
 
-    // Release the concurrency slot.
-    const budget = await ctx.db.query("budgetState").first();
-    if (budget && budget.activeCalls > 0) {
-      await ctx.db.patch(budget._id, { activeCalls: budget.activeCalls - 1 });
-    }
+    // Release the concurrency slot exactly once. Cost is unknown at client
+    // teardown — the webhook (recordEndOfCall) records it independently. `call`
+    // was read above (its marker reflects DB state before this mutation).
+    await releaseConcurrencyOnce(ctx, call);
     return null;
   },
 });

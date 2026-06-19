@@ -16,6 +16,7 @@ import { formatUsd, formatMs } from "@/lib/format";
 import { BudgetMeter } from "@/components/shared/budget-meter";
 import { BuilderViewBanner } from "@/components/shared/builder-view-banner";
 import { EmptyState } from "@/components/states/empty-state";
+import { matchQuery } from "@/components/states/async-section";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useBudgetState, useRecentCalls } from "@/lib/data";
 import type { BudgetState, CallSummary } from "@/lib/types";
@@ -68,27 +69,14 @@ export default function AnalyticsPage() {
   const active = useQuery(api.calls.activeCount);
   const today = useQuery(api.calls.countToday);
 
-  // Direct undefined checks (not a derived `loading` flag) so TypeScript narrows
-  // calls/active/today to non-undefined inside the populated branch.
-  const loading = calls === undefined || active === undefined || today === undefined;
-
-  function renderBody() {
-    if (calls === undefined || active === undefined || today === undefined) {
-      return <AnalyticsSkeleton />;
-    }
-    if (calls.length === 0) {
-      return (
-        <EmptyState
-          title="No calls yet"
-          description="These fill in once real calls come through."
-          action={{ label: "Try it", href: "/try" }}
-        />
-      );
-    }
-    return (
-      <AnalyticsBody calls={calls} budget={budget} active={active} today={today} />
-    );
-  }
+  // This screen needs three queries loaded together. Fold them into ONE value that
+  // stays `undefined` until all three resolve, so matchQuery owns the same
+  // loading → empty → data triad as every other route (and TS narrows all three in
+  // the data arm). The header copy reads the same combined-loaded check.
+  const loaded =
+    calls !== undefined && active !== undefined && today !== undefined
+      ? { calls, active, today }
+      : undefined;
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6">
@@ -97,15 +85,31 @@ export default function AnalyticsPage() {
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-balance">Analytics</h1>
         <p className="mt-1 text-sm text-pretty text-muted-foreground">
-          {loading
+          {loaded === undefined
             ? "Loading your call data…"
-            : calls && calls.length > 0
-              ? `Aggregated from the last ${calls.length} calls`
+            : loaded.calls.length > 0
+              ? `Aggregated from the last ${loaded.calls.length} calls`
               : "Aggregated from your real calls."}
         </p>
       </div>
 
-      {renderBody()}
+      {matchQuery(
+        loaded,
+        {
+          loading: <AnalyticsSkeleton />,
+          empty: (
+            <EmptyState
+              title="No calls yet"
+              description="These fill in once real calls come through."
+              action={{ label: "Try it", href: "/try" }}
+            />
+          ),
+          data: ({ calls, active, today }) => (
+            <AnalyticsBody calls={calls} budget={budget} active={active} today={today} />
+          ),
+        },
+        { isEmpty: (d) => d.calls.length === 0 },
+      )}
     </div>
   );
 }

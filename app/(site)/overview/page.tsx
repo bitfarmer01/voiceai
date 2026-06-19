@@ -4,6 +4,7 @@ import { useQuery } from "convex/react";
 import { PhoneCall, CalendarCheck, ChatCircle } from "@phosphor-icons/react";
 import { api } from "@/convex/_generated/api";
 import { EmptyState } from "@/components/states/empty-state";
+import { matchQuery } from "@/components/states/async-section";
 import { OwnerStatCard } from "@/components/owner/owner-stat-card";
 import { RecentActivityList } from "@/components/owner/recent-activity-list";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -28,46 +29,52 @@ export default function OverviewPage() {
         </p>
       </div>
 
-      {summary === undefined ? (
-        <OverviewSkeleton />
-      ) : summary.callsHandled === 0 ? (
-        <EmptyState
-          icon={PhoneCall}
-          title="No calls yet"
-          description="Once your receptionist answers its first call, you'll see what it handled — calls answered, appointments booked, and messages taken — right here."
-          action={{ label: "Try it", href: "/try" }}
-        />
-      ) : (
-        <div className="space-y-10">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <OwnerStatCard
+      {matchQuery(
+        summary,
+        {
+          loading: <OverviewSkeleton />,
+          empty: (
+            <EmptyState
               icon={PhoneCall}
-              label="Calls answered"
-              value={summary.callsAnswered}
-              hint="Calls your receptionist picked up and handled for you."
-              accent
+              title="No calls yet"
+              description="Once your receptionist answers its first call, you'll see what it handled — calls answered, appointments booked, and messages taken — right here."
+              action={{ label: "Try it", href: "/try" }}
             />
-            <OwnerStatCard
-              icon={CalendarCheck}
-              label="Appointments booked"
-              value={summary.appointmentsBooked}
-              hint="Callers who scheduled a visit during the call."
-            />
-            <OwnerStatCard
-              icon={ChatCircle}
-              label="Messages taken"
-              value={summary.messagesLeft}
-              hint="Callers who got in touch but didn't book a time."
-            />
-          </div>
+          ),
+          data: (s) => (
+            <div className="space-y-10">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <OwnerStatCard
+                  icon={PhoneCall}
+                  label="Calls answered"
+                  value={s.callsAnswered}
+                  hint="Calls your receptionist picked up and handled for you."
+                  accent
+                />
+                <OwnerStatCard
+                  icon={CalendarCheck}
+                  label="Appointments booked"
+                  value={s.appointmentsBooked}
+                  hint="Callers who scheduled a visit during the call."
+                />
+                <OwnerStatCard
+                  icon={ChatCircle}
+                  label="Messages taken"
+                  value={s.messagesLeft}
+                  hint="Callers who got in touch but didn't book a time."
+                />
+              </div>
 
-          {summary.recentActivity.length > 0 && (
-            <section>
-              <h2 className="mb-3 text-lg font-semibold text-balance">Recent activity</h2>
-              <RecentActivityList items={summary.recentActivity} />
-            </section>
-          )}
-        </div>
+              {s.recentActivity.length > 0 && (
+                <section>
+                  <h2 className="mb-3 text-lg font-semibold text-balance">Recent activity</h2>
+                  <RecentActivityList items={s.recentActivity} />
+                </section>
+              )}
+            </div>
+          ),
+        },
+        { isEmpty: (s) => s.callsHandled === 0 },
       )}
     </div>
   );

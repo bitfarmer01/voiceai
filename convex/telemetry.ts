@@ -24,6 +24,12 @@ export const batchWriteSpans = mutation({
   handler: async (ctx, args) => {
     // Guard: unknown call or a caller that doesn't own it → drop silently.
     const call = await ctx.db.get(args.callId);
+    // DEBUG(spans): ownership-guard outcome — the most likely silent server-side drop
+    console.log("DEBUG(spans) batchWriteSpans", {
+      incoming: args.spans.length,
+      callFound: !!call,
+      ownerOk: !!call && call.sessionId === args.sessionId,
+    });
     if (!call || call.sessionId !== args.sessionId) return null;
 
     // One query up front instead of N+1 .unique() lookups — the client

@@ -2,12 +2,18 @@ import { cn } from "@/lib/utils";
 import { formatMs, latencyTextClass } from "@/lib/format";
 import type { SpanKind } from "@/lib/types";
 
-/** Component-span colours for the waterfall (kept consistent with the Stitch report peek). */
+/**
+ * Categorical colours per span KIND (bars are sized by duration, coloured by which
+ * component ran). NOT the frozen latency scale — `bg-latency-*` is a semantic
+ * fast/slow verdict (see lib/format.ts) and must never stand in for a category.
+ * The pipeline stages (stt→llm→tts) use a neutral foreground ramp, modelled on
+ * CostBreakdown; tool/guardrail keep their own non-latency event colours.
+ */
 const SPAN_CLS: Partial<Record<SpanKind, string>> = {
-  stt: "bg-latency-good",
-  llm: "bg-latency-slow",
+  stt: "bg-foreground/25",
+  llm: "bg-foreground/45",
+  tts: "bg-foreground/65",
   tool: "bg-info",
-  tts: "bg-primary",
   guardrail: "bg-danger",
 };
 
@@ -69,7 +75,7 @@ export function TraceWaterfall({ turns, className }: { turns: WaterfallTurn[]; c
                       key={i}
                       className={cn("h-full", SPAN_CLS[s.kind])}
                       style={{ width: `${(s.durationMs / axisMax) * 100}%` }}
-                      title={`${SPAN_LABEL[s.kind] ?? s.kind}: ${formatMs(s.durationMs)}`}
+                      title={`${s.label ?? SPAN_LABEL[s.kind] ?? s.kind}: ${formatMs(s.durationMs)}`}
                     />
                   ))}
                 </div>

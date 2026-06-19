@@ -42,6 +42,34 @@ const SITE_URL =
 const WEBHOOK_URL = SITE_URL ? `${SITE_URL}/vapi/webhook` : undefined;
 const PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY;
 
+/**
+ * Resolve the base URL VAPI's servers will POST the receptionist tools to.
+ * Prefer the configured Convex site URL; fall back to the current origin so
+ * deployed builds without NEXT_PUBLIC_CONVEX_SITE_URL still attach tools.
+ * VAPI calls these server-to-server, so a localhost/private origin is
+ * unreachable — warn honestly when we resolve to one.
+ */
+function resolveToolBaseUrl(): string | undefined {
+  const base = SITE_URL || (typeof window !== "undefined" ? window.location.origin : "");
+  if (!base) return undefined;
+  if (/^https?:\/\/(localhost|127\.0\.0\.1|\[::1\]|0\.0\.0\.0)/i.test(base)) {
+    console.warn(
+      `[try] Tool base URL resolves to a local/non-public origin (${base}); VAPI cannot reach it server-to-server, so the receptionist tools (availability, booking, lookup) will not run. Set NEXT_PUBLIC_CONVEX_SITE_URL to a public URL.`,
+    );
+  }
+  return base;
+}
+
+/** A plain, spoken-friendly date label (e.g. "Thursday, June 18, 2026") for the prompt's date anchor. */
+function todayLabel(): string {
+  return new Date().toLocaleDateString("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+}
+
 export default function TryPage() {
   const [presetId, setPresetId] = React.useState(PRESETS[0].id);
   const [pipeline, setPipeline] = React.useState<PipelineSelection>(DEFAULT_PIPELINE);
@@ -179,6 +207,11 @@ export default function TryPage() {
     setStartError(null);
     if (!visitorKey) return;
 
+    // Resolved once per call: the tool endpoint base (falls back to current
+    // origin) and a date anchor so the model resolves "tomorrow" etc. correctly.
+    const toolBaseUrl = resolveToolBaseUrl();
+    const today = todayLabel();
+
     if (mode !== "preset") {
       if (!uploadedBizQ || uploadState.status !== "ready") return;
       try {
@@ -194,8 +227,9 @@ export default function TryPage() {
         setTrackedCallId(callId);
         const assistant = buildAssistantFromConvexBusiness(uploadedBizQ, pipeline, {
           webhookUrl: WEBHOOK_URL,
-          toolBaseUrl: SITE_URL || undefined,
+          toolBaseUrl,
           secret: PUBLIC_KEY,
+          today,
         });
         const vapiCallId = await call.start(assistant, callId, sessionId);
         if (vapiCallId) {
@@ -227,9 +261,10 @@ export default function TryPage() {
       setTrackedCallId(callId);
       const assistant = buildAssistant(preset, pipeline, {
         webhookUrl: WEBHOOK_URL,
-        toolBaseUrl: SITE_URL || undefined,
+        toolBaseUrl,
         secret: PUBLIC_KEY,
         businessId: business._id,
+        today,
       });
       const vapiCallId = await call.start(assistant, callId, sessionId);
       if (vapiCallId) {
@@ -351,7 +386,7 @@ export default function TryPage() {
                   <button
                     key={p.id}
                     onClick={() => setPresetId(p.id)}
-                    disabled={call.status === "live" || call.status === "connecting"}
+                    disabled={call.inProgress}
                     className={cn(
                       "flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors disabled:opacity-50",
                       presetId === p.id ? "border-primary bg-accent" : "hover:bg-muted",
@@ -372,25 +407,25 @@ export default function TryPage() {
               <DocUploader
                 onIngest={handleIngest}
                 state={uploadState}
-                disabled={call.status === "live" || call.status === "connecting"}
+                disabled={call.inProgress}
               />
             ) : customSource === "paste" ? (
               <TextPaste
                 onSubmit={handlePasteText}
                 state={uploadState}
-                disabled={call.status === "live" || call.status === "connecting"}
+                disabled={call.inProgress}
               />
             ) : customSource === "link" ? (
               <UrlInput
                 onSubmit={handleIngestUrl}
                 state={uploadState}
-                disabled={call.status === "live" || call.status === "connecting"}
+                disabled={call.inProgress}
               />
             ) : (
               <BusinessForm
                 onSubmit={handleGenerateFromForm}
                 state={uploadState}
-                disabled={call.status === "live" || call.status === "connecting"}
+                disabled={call.inProgress}
               />
             )}
           </section>
@@ -398,17 +433,17 @@ export default function TryPage() {
           <section className="rounded-xl border bg-card p-4">
             <div className="mb-2 flex items-center justify-between">
               <h2 className="text-sm font-semibold">
-                {mode !== "preset" && uploadedBizQ ? uploadedBizQ.companyName : preset.name}
+                {mode !== "preset" && uploadedBizQ ? uploadedBizQ.profile.companyName : preset.name}
               </h2>
               <Badge variant="secondary" className="text-[10px]">
                 Ready to answer
               </Badge>
             </div>
             <p className="text-xs text-muted-foreground">
-              {mode !== "preset" && uploadedBizQ ? uploadedBizQ.hours : preset.hours}
+              {mode !== "preset" && uploadedBizQ ? uploadedBizQ.profile.hours : preset.hours}
             </p>
             <div className="mt-3 flex flex-wrap gap-1.5">
-              {(mode !== "preset" && uploadedBizQ ? uploadedBizQ.services : preset.services).map((s) => (
+              {(mode !== "preset" && uploadedBizQ ? uploadedBizQ.profile.services : preset.services).map((s) => (
                 <span key={s} className="rounded-md border bg-muted px-2 py-0.5 text-[11px]">{s}</span>
               ))}
             </div>
