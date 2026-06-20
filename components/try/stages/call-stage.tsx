@@ -79,7 +79,7 @@ export function CallStage({
         </div>
       </div>
 
-      <div className="flex min-h-[560px] flex-col rounded-2xl border bg-card">
+      <div className="flex flex-col overflow-hidden rounded-2xl border bg-card">
         {blocked && (
           <div className="p-4">
             {guardReason === "concurrency" && <DemoBusyPanel slots={budget.maxConcurrent} />}
@@ -121,7 +121,7 @@ export function CallStage({
           </div>
         )}
 
-        <div className="min-h-0 flex-1 border-t p-4">
+        <div className="border-t p-4">
           {call.turns.length === 0 ? (
             <EmptyState
               title={call.status === "idle" ? "The conversation shows up here" : "Listening…"}
@@ -130,7 +130,7 @@ export function CallStage({
               }
             />
           ) : (
-            <CallTimeline turns={call.turns} className="h-full max-h-[260px]" />
+            <CallTimeline turns={call.turns} className="h-[300px]" />
           )}
         </div>
       </div>

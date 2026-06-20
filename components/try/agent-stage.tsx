@@ -40,7 +40,7 @@ function AgentStageImpl({
   const ended = status === "ended";
 
   return (
-    <div className={cn("relative flex flex-1 flex-col items-center justify-center gap-8 p-6", className)}>
+    <div className={cn("relative flex shrink-0 flex-col items-center justify-center gap-8 py-8 px-6", className)}>
       <span className="absolute left-0 top-0 inline-flex items-center gap-1.5 rounded-md border bg-card px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
         {language}
       </span>
