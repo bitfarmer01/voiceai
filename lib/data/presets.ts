@@ -1,9 +1,11 @@
-import type { BusinessProfile } from "@/lib/types";
+import type { BusinessProfile, ServiceDetail } from "@/lib/types";
 
 /** A preset business + the knowledge the receptionist is grounded in (injected as data). */
 export interface PresetBusiness extends BusinessProfile {
   greeting: string;
   knowledge: string; // FAQ/policy text, sandboxed as data in the system prompt
+  /** Structured service list with optional pricing, for the reference panel. */
+  serviceDetails?: ServiceDetail[];
 }
 
 export const PRESETS: PresetBusiness[] = [
@@ -15,6 +17,13 @@ export const PRESETS: PresetBusiness[] = [
     services: ["Routine cleaning", "Whitening", "Fillings", "Crowns", "Emergency visits"],
     policies: ["New patients welcome", "24h cancellation notice", "Most PPO insurance accepted"],
     chunkCount: 12,
+    serviceDetails: [
+      { name: "Routine cleaning", price: "$120" },
+      { name: "Whitening",        price: "$299" },
+      { name: "Fillings" },
+      { name: "Crowns" },
+      { name: "Emergency visits" },
+    ],
     greeting: "Thanks for calling Glow Dental! How can I help you today?",
     knowledge:
       "Glow Dental is a family dental clinic. Hours: Mon–Fri 8am–5pm, Sat 9am–1pm, closed Sunday. " +
@@ -30,6 +39,13 @@ export const PRESETS: PresetBusiness[] = [
     services: ["Haircut", "Color", "Balayage", "Blowout", "Bridal styling"],
     policies: ["Deposit required for color services", "48h cancellation notice", "Walk-ins when available"],
     chunkCount: 9,
+    serviceDetails: [
+      { name: "Haircut",         price: "from $55" },
+      { name: "Color",           price: "from $120" },
+      { name: "Balayage",        price: "from $180" },
+      { name: "Blowout",         price: "$45" },
+      { name: "Bridal styling" },
+    ],
     greeting: "Hi, thanks for calling Lux Salon! What can I do for you?",
     knowledge:
       "Lux Salon is a hair salon. Hours: Tue–Sat 10am–7pm, closed Sunday and Monday. " +
@@ -45,6 +61,12 @@ export const PRESETS: PresetBusiness[] = [
     services: ["Estate planning", "Family law", "Small-business formation", "Free 15-min consult"],
     policies: ["Consultations by appointment only", "Conflict check before booking", "No legal advice over the phone"],
     chunkCount: 14,
+    serviceDetails: [
+      { name: "Estate planning" },
+      { name: "Family law" },
+      { name: "Small-business formation" },
+      { name: "Initial consultation", price: "Free (15 min)" },
+    ],
     greeting: "Hello, you've reached Hale & Park Law. How can I help?",
     knowledge:
       "Hale & Park Law is a boutique law firm. Hours: Mon–Fri 9am–6pm, by appointment only. " +

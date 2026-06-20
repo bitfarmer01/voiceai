@@ -152,6 +152,23 @@ const lookupKnowledgeTool = httpAction(async (ctx, request) => {
     limit: typeof args.limit === "number" ? args.limit : undefined,
   });
 
+  // Best-effort: record which chunks were surfaced so the reference panel can
+  // highlight them. Non-fatal — a failure here never blocks the tool response.
+  if (result.found && result.chunks.length > 0) {
+    try {
+      await ctx.runMutation(internal.calls.patchUsedChunks, {
+        businessId,
+        chunks: result.chunks.map((c) => ({
+          chunkId: String(c.chunkId),
+          text: c.text,
+          tag: c.tags?.[0],
+        })),
+      });
+    } catch {
+      // Intentionally swallowed — chunk tracking is non-critical.
+    }
+  }
+
   return toolResponse(toolCallId, result);
 });
 

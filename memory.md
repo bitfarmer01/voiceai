@@ -1,6 +1,6 @@
 # Memory — Signal Bold UI + BYOD/appointment + Phase 3 telemetry
 
-Last updated: 2026-06-19 (`/try` rebuilt into a guided, opinionated journey — smart LLM form, UNCOMMITTED) · Branch: `feature/owner-reposition`
+Last updated: 2026-06-20 (deployed to Netlify via CLI — **LIVE at voiceai-receptionist.netlify.app**, on the dev Convex backend) · Branch: `feature/owner-reposition`
 
 > ⚠️ **Repo state (post-consolidation, 2026-06-19) — the old "uncommitted streams" gotchas are GONE:**
 > 1. **One branch is the source of truth:** `feature/owner-reposition` (local + `origin` in sync at `cd093d9`).
@@ -13,6 +13,66 @@ Last updated: 2026-06-19 (`/try` rebuilt into a guided, opinionated journey — 
 >    reflog ~90d (e.g. `byod-try-page` `ad276b0`, `phase3` `1e62781`, `ws1` `1331dcd`); remote copies are gone.
 > 4. **Convex:** dev DB was re-seeded CLEAN (presets only, zero fabricated calls/stats/budget). Keep `convex dev`
 >    running; the consolidated commit includes Phase-3 telemetry so the dev deploy is not regressed.
+
+## Deployed to Netlify via CLI (2026-06-20) — LIVE on the dev backend
+
+User reported "not deploying on netlify correctly," then pivoted to "deploy via the Netlify CLI." Deployed
+end-to-end with the CLI (pnpm-only). **LIVE: https://voiceai-receptionist.netlify.app** (Netlify project
+`voiceai-receptionist`, team `rajath-zstbeqs`, Site/Project ID `cb688c46-58d9-456f-a78f-101ff5f9f039`).
+
+**Likely original failure cause:** Next 16 needs Node ≥ 20.9, but Netlify's default build image is Node 18 →
+build fails. Fix = pin `NODE_VERSION = "22"` in `netlify.toml`.
+
+**What shipped (deploy IS done; app loads + is wired to the backend):**
+- **NEW `netlify.toml`** (committed LOCALLY only — see git note): `[build] command = "pnpm build"` +
+  `[build.environment] NODE_VERSION = "22"`. NO `@netlify/plugin-nextjs` block (Netlify auto-installs the Next
+  runtime; a manual block conflicts). App is SSR — one dynamic server fn (`/api/ics/[leadId]`) + pages; no
+  middleware, no edge runtime, no static export → clean fit for the Netlify Next runtime.
+- **Backend = EXISTING Convex DEV deployment `notable-wildcat-778`** (NOT prod — see decision). The build does
+  NOT run `convex deploy`; the frontend just points at the live dev backend via env. Confirmed the dev convex
+  URL is baked into the client JS bundle.
+- **Netlify site env vars** (set via CLI, no secrets stored in memory): `NEXT_PUBLIC_CONVEX_URL` =
+  `https://notable-wildcat-778.convex.cloud`, `NEXT_PUBLIC_CONVEX_SITE_URL` =
+  `https://notable-wildcat-778.convex.site`, `NEXT_PUBLIC_VAPI_PUBLIC_KEY` (sourced from `.env.local`).
+- **Deploy was MANUAL CLI:** `netlify deploy --build --prod` (builds locally, uploads). **Continuous deploy is
+  NOT wired** (`netlify init` never run). Redeploy after code changes with
+  `pnpm --package=netlify-cli dlx netlify deploy --build --prod`.
+
+**Decisions:**
+- **Dev backend over prod, for speed.** User originally chose prod Convex + continuous GitHub deploy (via
+  AskUserQuestion), but couldn't produce a `prod:` deploy key — the dashboard yielded a `preview:` key, then a
+  `dev:` key (for a different/empty deployment `ardent-fox-814`). Rather than churn, pivoted to pointing at the
+  already-seeded dev backend (no key needed). Prod upgrade deferred.
+- **CLI install method:** `pnpm --package=netlify-cli dlx netlify <cmd>` (netlify-cli 26.1.0). NO global install
+  (`pnpm add -g` failed: PNPM_HOME unset; avoided `pnpm setup`, which edits the shell profile). Auth persists in
+  `~/Library/Preferences/netlify`, link state in `.netlify/state.json`, so dlx works across commands.
+
+**Gotchas:**
+- **zsh does NOT word-split a quoted command var** (`NTL="pnpm … netlify"; $NTL x` → "command not found"). Use a
+  function inside a single Bash call: `ntl(){ pnpm --package=netlify-cli dlx netlify "$@"; }`.
+- **`curl` and `head` are NOT on the sandbox Bash PATH** — verify HTTP with `node -e` + global `fetch`.
+- `login` / `sites:create --account-slug rajath-zstbeqs` / `link --name` ran non-interactively; only
+  `netlify init` (GitHub continuous-deploy OAuth) is truly browser-interactive (so it was skipped).
+
+**Verified:** `/`, `/try`, `/calls` → HTTP 200; title "The receptionist that never misses a call"; convex dev
+URL present in a client chunk. **NOT verified (needs a human mic):** a real voice call on the deployed `/try`
+(webhook → `notable-wildcat-778.convex.site/vapi/webhook`).
+
+**Git:** `netlify.toml` + `.gitignore` (CLI added `.netlify/`) committed LOCALLY as `e613444` on
+`feature/owner-reposition` (ahead of origin by 1, **NOT pushed**). Push it before wiring continuous deploy.
+
+**SECURITY follow-up:** the user pasted a `preview:` and a `dev:` Convex deploy key into the chat — credentials
+now in conversation history. Recommend rotating/revoking them in the Convex dashboard. (None were written to any file.)
+
+**Next session / open items:**
+1. (Optional) **Continuous deploy:** `netlify init` to connect `bitfarmer01/voiceai` (browser OAuth); set
+   production branch = `feature/owner-reposition` (main is behind). Push `e613444` first.
+2. (Optional) **Upgrade to prod Convex:** generate a `prod:` deploy key → set `CONVEX_DEPLOY_KEY` on Netlify →
+   switch netlify.toml build to `pnpm exec convex deploy --cmd 'pnpm build'` (then drop the manual
+   `NEXT_PUBLIC_CONVEX_URL`; Convex injects it) → set Convex PROD env (`NVIDIA_NIM_API_KEY`, `VAPI_PRIVATE_KEY`,
+   `NEXT_PUBLIC_VAPI_PUBLIC_KEY`) → seed prod presets (`convex run seed:seed`).
+3. **Live voice-call smoke test** on the deployed URL (still pending; needs a human).
+4. The live site depends on the dev Convex deployment `notable-wildcat-778` staying active.
 
 ## `/try` rebuilt into a guided, opinionated journey (2026-06-19, UNCOMMITTED)
 

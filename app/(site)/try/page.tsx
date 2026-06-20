@@ -95,6 +95,16 @@ export default function TryPage() {
           onTalk={() => (view === "demo-call" ? startDemo() : yourBiz && startYour(yourBiz))}
           onEnd={tc.call.stop}
           onToggleMute={tc.call.toggleMute}
+          services={
+            view === "demo-call"
+              ? (DEMO_PRESET.serviceDetails ?? DEMO_PRESET.services)
+              : (yourBiz?.profile.services ?? [])
+          }
+          hoursText={
+            view === "demo-call" ? DEMO_PRESET.hours : (yourBiz?.profile.hours ?? "")
+          }
+          chunks={tc.chunks}
+          usedChunkIds={tc.usedChunkIds}
         />
       )}
 

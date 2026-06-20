@@ -140,3 +140,14 @@ export interface BusinessProfile {
   policies: string[];
   chunkCount: number;
 }
+
+// ── Reference panel ──────────────────────────────────────────────────────────
+/** A single service with optional displayed price (used by the reference panel). */
+export type ServiceDetail = { name: string; price?: string }
+
+/** A knowledge chunk as returned by api.knowledgeChunks.listForBusiness. */
+export interface KnowledgeChunk {
+  _id: string;
+  text: string;
+  tags: string[];
+}

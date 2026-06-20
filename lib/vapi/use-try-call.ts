@@ -6,6 +6,7 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { bookingFromStructuredData } from "@/lib/calls/booking";
 import type { PresetBusiness } from "@/lib/data/presets";
+import type { KnowledgeChunk } from "@/lib/types";
 import { useBudgetState } from "@/lib/data";
 import { useVisitorKey } from "@/lib/hooks/use-visitor-key";
 import {
@@ -77,6 +78,10 @@ export interface TryCall {
   beginBusiness: (biz: ConvexBusinessForAssistant) => Promise<void>;
   /** Reset the call back to idle (for "call again") without losing `lastCallId`. */
   resetCall: () => void;
+  /** All knowledge chunks for the current business (undefined while loading). */
+  chunks: KnowledgeChunk[] | undefined;
+  /** IDs of chunks the receptionist drew from this call so far. */
+  usedChunkIds: string[];
 }
 
 /**
@@ -90,6 +95,7 @@ export function useTryCall(): TryCall {
   const [startError, setStartError] = React.useState<string | null>(null);
   const [lastCallId, setLastCallId] = React.useState<string | null>(null);
   const [trackedCallId, setTrackedCallId] = React.useState<string | null>(null);
+  const [currentBusinessId, setCurrentBusinessId] = React.useState<Id<"businesses"> | null>(null);
   const activeCallIdRef = React.useRef<string | null>(null);
   const [sessionId] = React.useState(() => crypto.randomUUID());
 
@@ -102,7 +108,19 @@ export function useTryCall(): TryCall {
     api.calls.getById,
     trackedCallId ? { callId: trackedCallId as Id<"calls">, visitorKey } : "skip",
   );
+  const chunks = useQuery(
+    api.knowledgeChunks.listForBusiness,
+    currentBusinessId ? { businessId: currentBusinessId } : "skip",
+  );
   const booking = bookingFromStructuredData(trackedCall?.structuredData);
+
+  const usedChunkIds: string[] = React.useMemo(() => {
+    const data = trackedCall?.structuredData as
+      | { usedChunks?: Array<{ chunkId: string }> }
+      | null
+      | undefined;
+    return data?.usedChunks?.map((c) => c.chunkId) ?? [];
+  }, [trackedCall?.structuredData]);
 
   const startCallM = useMutation(api.calls.startCall);
   const attachVapiIdM = useMutation(api.calls.attachVapiId);
@@ -148,6 +166,7 @@ export function useTryCall(): TryCall {
         setStartError("The demo isn't ready yet — give it a moment and try again.");
         return;
       }
+      setCurrentBusinessId(business._id);
       const assistant = buildAssistant(preset, pipeline, {
         webhookUrl: WEBHOOK_URL,
         toolBaseUrl: resolveToolBaseUrl(),
@@ -164,6 +183,7 @@ export function useTryCall(): TryCall {
     async (biz: ConvexBusinessForAssistant) => {
       setStartError(null);
       if (!visitorKey) return;
+      setCurrentBusinessId(biz._id as Id<"businesses">);
       const assistant = buildAssistantFromConvexBusiness(biz, pipeline, {
         webhookUrl: WEBHOOK_URL,
         toolBaseUrl: resolveToolBaseUrl(),
@@ -203,5 +223,7 @@ export function useTryCall(): TryCall {
     beginDemo,
     beginBusiness,
     resetCall,
+    chunks,
+    usedChunkIds,
   };
 }

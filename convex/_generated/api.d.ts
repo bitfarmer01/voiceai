@@ -15,6 +15,7 @@ import type * as calls from "../calls.js";
 import type * as guard from "../guard.js";
 import type * as http from "../http.js";
 import type * as ingest from "../ingest.js";
+import type * as knowledgeChunks from "../knowledgeChunks.js";
 import type * as leads from "../leads.js";
 import type * as lib___fixtures___vapiEndOfCallReport from "../lib/__fixtures__/vapiEndOfCallReport.js";
 import type * as lib_hours from "../lib/hours.js";
@@ -48,6 +49,7 @@ declare const fullApi: ApiFromModules<{
   guard: typeof guard;
   http: typeof http;
   ingest: typeof ingest;
+  knowledgeChunks: typeof knowledgeChunks;
   leads: typeof leads;
   "lib/__fixtures__/vapiEndOfCallReport": typeof lib___fixtures___vapiEndOfCallReport;
   "lib/hours": typeof lib_hours;

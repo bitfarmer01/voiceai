@@ -511,6 +511,55 @@ export const recordEndOfCall = internalMutation({
   },
 });
 
+// ── patchUsedChunks (internal; called from http.ts lookupKnowledgeTool) ──────
+// Appends newly-used knowledge chunks to the live call's structuredData so the
+// /try reference panel can highlight them in real time. Idempotent by chunkId.
+// Uses businessId to find the live call (same pattern as bookAppointment) since
+// the assistant is built before the callId is created and can't carry it in the
+// tool URL.
+export const patchUsedChunks = internalMutation({
+  args: {
+    businessId: v.id("businesses"),
+    chunks: v.array(
+      v.object({
+        chunkId: v.string(),
+        text: v.string(),
+        tag: v.optional(v.string()),
+      }),
+    ),
+  },
+  returns: v.null(),
+  handler: async (ctx, { businessId, chunks }) => {
+    if (chunks.length === 0) return null;
+
+    // Find the most recent live call for this business.
+    const businessCalls = await ctx.db
+      .query("calls")
+      .withIndex("by_business", (q) => q.eq("businessId", businessId))
+      .collect();
+    const sorted = [...businessCalls].sort((a, b) => b.startedAt - a.startedAt);
+    const liveCall = sorted.find((c) => c.status === "live") ?? sorted[0] ?? null;
+    if (!liveCall) return null;
+
+    const existingData =
+      typeof liveCall.structuredData === "object" && liveCall.structuredData !== null
+        ? (liveCall.structuredData as Record<string, unknown>)
+        : {};
+    const existing: Array<{ chunkId: string }> = Array.isArray(existingData.usedChunks)
+      ? (existingData.usedChunks as Array<{ chunkId: string }>)
+      : [];
+
+    const existingIds = new Set(existing.map((c) => c.chunkId));
+    const fresh = chunks.filter((c) => !existingIds.has(c.chunkId));
+    if (fresh.length === 0) return null;
+
+    await ctx.db.patch(liveCall._id, {
+      structuredData: { ...existingData, usedChunks: [...existing, ...fresh] },
+    });
+    return null;
+  },
+});
+
 /** Outcome derivation used by recordEndOfCall (pure). */
 function deriveOutcome(
   structuredData: unknown,
