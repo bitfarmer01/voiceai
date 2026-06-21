@@ -70,6 +70,43 @@ test("upsertConfigured overwrites: same slug replaces profile + chunks, no dupli
   expect(got!.chunks[0].text).toBe("Now open Saturdays.");
 });
 
+test("getBySlug is case-insensitive: a mixed-case lookup finds a lowercase-saved business", async () => {
+  const t = convexTest(schema, modules);
+  await t.mutation(api.businesses.upsertConfigured, {
+    slug: "Hale-Park-Law",
+    name: "Hale Park Law",
+    profile: PROFILE,
+    chunks: [],
+  });
+  const got = await t.query(api.businesses.getBySlug, { slug: "hale-park-law" });
+  expect(got).not.toBeNull();
+  expect(got!.name).toBe("Hale Park Law");
+});
+
+test("upsertConfigured normalizes slug: different-case saves hit the SAME row", async () => {
+  const t = convexTest(schema, modules);
+  const first = await t.mutation(api.businesses.upsertConfigured, {
+    slug: "Hale-Park-Law",
+    name: "Hale Park Law",
+    profile: PROFILE,
+    chunks: [],
+  });
+  const second = await t.mutation(api.businesses.upsertConfigured, {
+    slug: "  HALE-PARK-LAW  ",
+    name: "Hale Park Law LLP",
+    profile: { ...PROFILE, companyName: "Hale Park Law LLP" },
+    chunks: [],
+  });
+  expect(second).toBe(first); // same row, not a duplicate
+  const got = await t.query(api.businesses.getBySlug, { slug: "hale-park-law" });
+  expect(got!.name).toBe("Hale Park Law LLP");
+  // Exactly one configured business exists for this slug.
+  const rows = await t.run((ctx) =>
+    ctx.db.query("businesses").withIndex("by_slug", (q) => q.eq("slug", "hale-park-law")).collect(),
+  );
+  expect(rows).toHaveLength(1);
+});
+
 test("configured business has no expiresAt and kind 'configured'", async () => {
   const t = convexTest(schema, modules);
   await t.mutation(api.businesses.upsertConfigured, {

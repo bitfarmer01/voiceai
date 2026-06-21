@@ -28,6 +28,8 @@ export function PostCallReport({
   report: CallReport;
   onCallAgain: () => void;
 }) {
+  const finalized = !!report && report.durationSec > 0;
+
   return (
     <div className="mx-auto w-full max-w-2xl px-4 py-8">
       <div className="flex items-center gap-3">
@@ -41,10 +43,13 @@ export function PostCallReport({
       </div>
 
       <dl className="mt-5 grid grid-cols-3 gap-3">
-        <Stat label="Duration" value={formatDuration(report?.durationSec ?? 0)} />
-        <Stat label="Cost" value={formatUsd(report?.costUsd ?? 0)} />
-        <Stat label="First word" value={formatMs(report?.ttfwMs ?? 0)} />
+        <Stat label="Duration" value={finalized ? formatDuration(report!.durationSec) : "—"} />
+        <Stat label="Cost" value={finalized ? formatUsd(report!.costUsd) : "—"} />
+        <Stat label="First word" value={finalized ? formatMs(report!.ttfwMs ?? 0) : "—"} />
       </dl>
+      {!finalized && (
+        <p className="mt-2 text-center text-[11px] text-muted-foreground">Finalizing call details…</p>
+      )}
 
       <div className="mt-6 rounded-2xl border bg-card p-4">
         <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">

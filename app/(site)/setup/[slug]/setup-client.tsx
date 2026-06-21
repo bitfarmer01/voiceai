@@ -62,7 +62,8 @@ export function SetupClient({ slug }: { slug: string }) {
 
 function SavedConfirmation({ slug }: { slug: string }) {
   const [copied, setCopied] = React.useState(false);
-  const path = `/app/${slug}`;
+  const canonical = slug.trim().toLowerCase();
+  const path = `/app/${canonical}`;
   const url = typeof window !== "undefined" ? `${window.location.origin}${path}` : path;
 
   const copy = async () => {

@@ -94,9 +94,10 @@ export const getBySlug = query({
     }),
   ),
   handler: async (ctx, args) => {
+    const slug = args.slug.trim().toLowerCase();
     const biz = await ctx.db
       .query("businesses")
-      .withIndex("by_slug", (q) => q.eq("slug", args.slug))
+      .withIndex("by_slug", (q) => q.eq("slug", slug))
       .first();
     if (!biz) return null;
     const chunks = await ctx.db
@@ -141,9 +142,10 @@ export const upsertConfigured = mutation({
   },
   returns: v.id("businesses"),
   handler: async (ctx, args) => {
+    const slug = args.slug.trim().toLowerCase();
     const existing = await ctx.db
       .query("businesses")
-      .withIndex("by_slug", (q) => q.eq("slug", args.slug))
+      .withIndex("by_slug", (q) => q.eq("slug", slug))
       .first();
 
     let businessId: Id<"businesses">;
@@ -164,7 +166,7 @@ export const upsertConfigured = mutation({
     } else {
       businessId = await ctx.db.insert("businesses", {
         kind: "configured",
-        slug: args.slug,
+        slug,
         name: args.name,
         profile: args.profile,
         chunkCount: args.chunks.length,
