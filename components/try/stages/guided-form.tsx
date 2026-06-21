@@ -50,7 +50,8 @@ function useIdleCallback(value: string, delayMs: number, cb: (v: string) => void
  * the rest (hours, policies, FAQ), and the owner reviews/edits before anything is
  * stored. Two assists: a "Draft my receptionist" button, and per-field live
  * suggestions that fire only after 5s of no typing (ghost-text for the type field,
- * tap-to-add chips for services). Calls `onReady` with the built business.
+ * tap-to-add chips for services). Calls `onReady` with the built business (/try path),
+ * or `onSaveConfig` with the assembled profile (setup path).
  */
 export function GuidedForm({
   sessionId,
@@ -58,6 +59,7 @@ export function GuidedForm({
   onSaveConfig,
   submitLabel,
   submittingLabel,
+  showOtherWays = true,
 }: {
   sessionId: string;
   onReady?: (biz: ConvexBusinessForAssistant) => void;
@@ -71,6 +73,7 @@ export function GuidedForm({
   }) => Promise<void>;
   submitLabel?: string;
   submittingLabel?: string;
+  showOtherWays?: boolean;
 }) {
   const [phase, setPhase] = React.useState<"seed" | "drafting" | "review">("seed");
   const [companyName, setCompanyName] = React.useState("");
@@ -360,21 +363,23 @@ export function GuidedForm({
             We&apos;ll fill in hours, booking, and common questions — you review it next.
           </p>
 
-          <div className="mt-6 border-t pt-4">
-            <button
-              onClick={() => setShowOther((s) => !s)}
-              className="flex w-full items-center justify-between text-sm text-muted-foreground hover:text-foreground"
-              aria-expanded={showOther}
-            >
-              Rather paste your info or upload a file?
-              <CaretDown className={cn("size-4 transition-transform", showOther && "rotate-180")} />
-            </button>
-            {showOther && (
-              <div className="mt-3">
-                <OtherWays sessionId={sessionId} onReady={onReady ?? (() => {})} disabled={phase === "drafting"} />
-              </div>
-            )}
-          </div>
+          {showOtherWays && (
+            <div className="mt-6 border-t pt-4">
+              <button
+                onClick={() => setShowOther((s) => !s)}
+                className="flex w-full items-center justify-between text-sm text-muted-foreground hover:text-foreground"
+                aria-expanded={showOther}
+              >
+                Rather paste your info or upload a file?
+                <CaretDown className={cn("size-4 transition-transform", showOther && "rotate-180")} />
+              </button>
+              {showOther && (
+                <div className="mt-3">
+                  <OtherWays sessionId={sessionId} onReady={onReady ?? (() => {})} disabled={phase === "drafting"} />
+                </div>
+              )}
+            </div>
+          )}
         </>
       ) : (
         <>
