@@ -55,9 +55,22 @@ function useIdleCallback(value: string, delayMs: number, cb: (v: string) => void
 export function GuidedForm({
   sessionId,
   onReady,
+  onSaveConfig,
+  submitLabel,
+  submittingLabel,
 }: {
   sessionId: string;
-  onReady: (biz: ConvexBusinessForAssistant) => void;
+  onReady?: (biz: ConvexBusinessForAssistant) => void;
+  onSaveConfig?: (profile: {
+    companyName: string;
+    hours: string;
+    services: string[];
+    policies: string[];
+    availability: string;
+    chunks: { text: string; tags: string[] }[];
+  }) => Promise<void>;
+  submitLabel?: string;
+  submittingLabel?: string;
 }) {
   const [phase, setPhase] = React.useState<"seed" | "drafting" | "review">("seed");
   const [companyName, setCompanyName] = React.useState("");
@@ -179,9 +192,23 @@ export function GuidedForm({
       availability: editBooking.trim(),
       chunks: draft.chunks,
     };
+
+    // Setup path: persist via the injected saver (e.g. upsertConfigured). The parent
+    // advances on success and this component unmounts.
+    if (onSaveConfig) {
+      try {
+        await onSaveConfig(profile);
+      } catch {
+        setError("Couldn't save your configuration — please try again.");
+        setSubmitting(false);
+      }
+      return;
+    }
+
+    // Default /try path: create the business, then start the call.
     try {
       const { businessId } = await createBizA({ sessionId, ...profile });
-      onReady({
+      onReady?.({
         _id: businessId,
         name,
         profile: {
@@ -344,7 +371,7 @@ export function GuidedForm({
             </button>
             {showOther && (
               <div className="mt-3">
-                <OtherWays sessionId={sessionId} onReady={onReady} disabled={phase === "drafting"} />
+                <OtherWays sessionId={sessionId} onReady={onReady ?? (() => {})} disabled={phase === "drafting"} />
               </div>
             )}
           </div>
@@ -403,11 +430,11 @@ export function GuidedForm({
             {submitting ? (
               <>
                 <CircleNotch className="size-4 animate-spin" />
-                Setting up…
+                {submittingLabel ?? "Setting up…"}
               </>
             ) : (
               <>
-                Sounds right — call my receptionist
+                {submitLabel ?? "Sounds right — call my receptionist"}
                 <ArrowRight className="size-4" />
               </>
             )}
