@@ -86,7 +86,8 @@ export default defineSchema({
   // ── businesses ────────────────────────────────────────────────────────────────
   // plan.md §10: kind preset|upload, ephemeral session-scoped with expiresAt.
   businesses: defineTable({
-    kind: v.union(v.literal("preset"), v.literal("upload")),
+    kind: v.union(v.literal("preset"), v.literal("upload"), v.literal("configured")),
+    slug: v.optional(v.string()),
     sessionId: v.optional(v.string()),
     name: v.string(),
     profile: businessProfile,
@@ -105,7 +106,8 @@ export default defineSchema({
   })
     .index("by_session", ["sessionId"])
     .index("by_kind", ["kind"])
-    .index("by_expiresAt", ["expiresAt"]),
+    .index("by_expiresAt", ["expiresAt"])
+    .index("by_slug", ["slug"]),
 
   // ── knowledgeChunks ───────────────────────────────────────────────────────────
   // plan.md §5.1 / §10: FAQ/policy chunks; keyword search powers lookup_knowledge.

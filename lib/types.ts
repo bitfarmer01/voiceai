@@ -134,7 +134,7 @@ export interface Booking {
 export interface BusinessProfile {
   id: string;
   name: string;
-  kind: "preset" | "upload";
+  kind: "preset" | "upload" | "configured";
   hours: string;
   services: string[];
   policies: string[];
