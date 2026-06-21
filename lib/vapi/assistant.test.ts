@@ -100,4 +100,25 @@ describe("buildAssistantFromConvexBusiness — BYOD", () => {
     const s = systemContent(buildAssistantFromConvexBusiness(convexBiz, DEFAULT_PIPELINE));
     expect(s).not.toMatch(/Today is/);
   });
+
+  it("appends the caller-context addendum verbatim when callerContext is provided", () => {
+    const s = systemContent(
+      buildAssistantFromConvexBusiness(convexBiz, DEFAULT_PIPELINE, {
+        callerContext: "I need a same-day emergency appointment",
+      }),
+    );
+    expect(s).toContain(
+      'The caller mentioned before starting: "I need a same-day emergency appointment"',
+    );
+  });
+
+  it("omits the caller-context addendum when callerContext is absent or blank", () => {
+    const without = systemContent(buildAssistantFromConvexBusiness(convexBiz, DEFAULT_PIPELINE));
+    expect(without).not.toMatch(/caller mentioned before starting/i);
+
+    const blank = systemContent(
+      buildAssistantFromConvexBusiness(convexBiz, DEFAULT_PIPELINE, { callerContext: "   " }),
+    );
+    expect(blank).not.toMatch(/caller mentioned before starting/i);
+  });
 });

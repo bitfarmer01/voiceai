@@ -17,6 +17,7 @@ import {
   type PipelineSelection,
 } from "@/lib/vapi/assistant";
 import { useVapiCall, type VapiCall } from "@/lib/vapi/use-vapi-call";
+import type { FunctionReturnType } from "convex/server";
 
 const SITE_URL =
   process.env.NEXT_PUBLIC_CONVEX_SITE_URL ??
@@ -74,8 +75,10 @@ export interface TryCall {
   presetsReady: boolean;
   /** Start the demo call against a preset business (resolves its Convex id by name). */
   beginDemo: (preset: PresetBusiness) => Promise<void>;
-  /** Start a call against an owner-built business. */
-  beginBusiness: (biz: ConvexBusinessForAssistant) => Promise<void>;
+  /** Start a call against an owner-built / configured business, with optional pre-call context. */
+  beginBusiness: (biz: ConvexBusinessForAssistant, opts?: { callerContext?: string }) => Promise<void>;
+  /** The tracked call's non-PII report projection (api.calls.getById): undefined while loading, null if absent/unowned. */
+  trackedCall: FunctionReturnType<typeof api.calls.getById> | undefined;
   /** Reset the call back to idle (for "call again") without losing `lastCallId`. */
   resetCall: () => void;
   /** All knowledge chunks for the current business (undefined while loading). */
@@ -180,7 +183,7 @@ export function useTryCall(): TryCall {
   );
 
   const beginBusiness = React.useCallback(
-    async (biz: ConvexBusinessForAssistant) => {
+    async (biz: ConvexBusinessForAssistant, opts?: { callerContext?: string }) => {
       setStartError(null);
       if (!visitorKey) return;
       setCurrentBusinessId(biz._id as Id<"businesses">);
@@ -189,6 +192,7 @@ export function useTryCall(): TryCall {
         toolBaseUrl: resolveToolBaseUrl(),
         secret: PUBLIC_KEY,
         today: todayLabel(),
+        callerContext: opts?.callerContext,
       });
       await begin(biz._id as Id<"businesses">, assistant);
     },
@@ -225,5 +229,6 @@ export function useTryCall(): TryCall {
     resetCall,
     chunks,
     usedChunkIds,
+    trackedCall,
   };
 }
