@@ -10,6 +10,7 @@ import { ConsentDialog } from "@/components/states/guard-panels";
 import { CallStage } from "@/components/try/stages/call-stage";
 import { PostCallReport } from "@/components/app/post-call-report";
 import { EmptyState } from "@/components/states/empty-state";
+import { ReceptionistChat } from "@/components/chat/receptionist-chat";
 
 type Stage = "pre-call" | "in-call" | "post-call";
 
@@ -122,6 +123,19 @@ export function AppDemoClient({ slug }: { slug: string }) {
           pendingStartRef.current = null;
           fn?.();
         }}
+      />
+
+      <ReceptionistChat
+        businessId={biz._id}
+        businessName={biz.profile.companyName}
+        knowledge={[
+          `Company: ${biz.profile.companyName}`,
+          `Hours: ${biz.profile.hours}`,
+          `Services: ${biz.profile.services.join(", ")}`,
+          ...(biz.profile.policies?.length ? [`Policies: ${biz.profile.policies.join("; ")}`] : []),
+          ...(biz.profile.availability ? [`Availability: ${biz.profile.availability}`] : []),
+        ].join("\n")}
+        callerContext={callerContext.trim() || undefined}
       />
     </div>
   );
