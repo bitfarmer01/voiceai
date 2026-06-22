@@ -12,6 +12,7 @@ import type * as _contracts from "../_contracts.js";
 import type * as budget from "../budget.js";
 import type * as businesses from "../businesses.js";
 import type * as calls from "../calls.js";
+import type * as chat from "../chat.js";
 import type * as guard from "../guard.js";
 import type * as http from "../http.js";
 import type * as ingest from "../ingest.js";
@@ -46,6 +47,7 @@ declare const fullApi: ApiFromModules<{
   budget: typeof budget;
   businesses: typeof businesses;
   calls: typeof calls;
+  chat: typeof chat;
   guard: typeof guard;
   http: typeof http;
   ingest: typeof ingest;
