@@ -149,6 +149,10 @@ export default defineSchema({
     qualityMetrics: v.optional(qualityMetrics),
     guardrailEvents: v.optional(v.array(v.string())),
     visitorKey: v.optional(v.string()),
+    // Channel that produced this call row. Absent / "voice" = a real voice call
+    // (unchanged behavior). "chat" = a minimal anchor created only to attach a
+    // text-chat booking's lead FK; excluded from voice stats/feeds.
+    channel: v.optional(v.union(v.literal("voice"), v.literal("chat"))),
     // Per-call idempotency markers for split-brain finalization (endCall vs the
     // webhook). Each fact is released/recorded independently exactly once,
     // regardless of teardown order. Additive optionals — frozen-contract-safe.

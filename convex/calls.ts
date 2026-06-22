@@ -423,7 +423,7 @@ export const listRecentAnonymized = query({
       .withIndex("by_startedAt")
       .order("desc")
       .take(limit * 3);
-    const ended = rows.filter((c) => c.status === "ended").slice(0, limit);
+    const ended = rows.filter((c) => c.status === "ended" && c.channel !== "chat").slice(0, limit);
     return ended.map((c) => ({
       id: c._id,
       businessName: c.businessName,

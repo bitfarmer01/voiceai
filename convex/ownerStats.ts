@@ -94,10 +94,12 @@ export const summary = query({
 
     // Indexed read: only calls the receptionist actually handled to completion.
     // (by_status, equality on "ended" — no `.filter()` for the WHERE clause.)
-    const ended: Doc<"calls">[] = await ctx.db
-      .query("calls")
-      .withIndex("by_status", (q) => q.eq("status", "ended"))
-      .collect();
+    const ended: Doc<"calls">[] = (
+      await ctx.db
+        .query("calls")
+        .withIndex("by_status", (q) => q.eq("status", "ended"))
+        .collect()
+    ).filter((c) => c.channel !== "chat");
 
     let appointmentsBooked = 0;
     let messagesLeft = 0;
