@@ -26,6 +26,12 @@ export function ReceptionistChat({
 }) {
   const [open, setOpen] = React.useState(false);
   const [input, setInput] = React.useState("");
+  const inputRef = React.useRef<HTMLInputElement>(null);
+
+  // Move focus to the message input when the panel opens.
+  React.useEffect(() => {
+    if (open) inputRef.current?.focus();
+  }, [open]);
 
   // Globally-unique, persisted per-browser id (the same primitive the voice
   // path uses) so two visitors never share a chat session or booking anchor.
@@ -63,6 +69,13 @@ export function ReceptionistChat({
         <div
           role="dialog"
           aria-label={`Chat with ${businessName}`}
+          tabIndex={-1}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              e.stopPropagation();
+              setOpen(false);
+            }
+          }}
           className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] right-[calc(1rem+env(safe-area-inset-right))] z-50 flex h-[min(70dvh,560px)] w-[min(92vw,380px)] flex-col overflow-hidden rounded-xl border border-border bg-background shadow-lg"
         >
           <header className="flex items-center justify-between border-b border-border px-4 py-3">
@@ -141,6 +154,7 @@ export function ReceptionistChat({
 
           <div className="flex items-center gap-2 border-t border-border px-3 py-2">
             <input
+              ref={inputRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => {

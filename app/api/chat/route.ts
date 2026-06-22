@@ -37,6 +37,11 @@ export async function POST(req: Request) {
     return new Response("Missing businessId or sessionId", { status: 400 });
   }
 
+  if (!process.env.NVIDIA_NIM_API_KEY) {
+    console.error("chat: NVIDIA_NIM_API_KEY is not set on the server");
+    return new Response("Chat is not configured", { status: 500 });
+  }
+
   const nim = createOpenAI({
     baseURL: NIM_BASE_URL,
     apiKey: process.env.NVIDIA_NIM_API_KEY ?? "",

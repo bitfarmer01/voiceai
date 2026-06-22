@@ -19,6 +19,7 @@ import type * as ingest from "../ingest.js";
 import type * as knowledgeChunks from "../knowledgeChunks.js";
 import type * as leads from "../leads.js";
 import type * as lib___fixtures___vapiEndOfCallReport from "../lib/__fixtures__/vapiEndOfCallReport.js";
+import type * as lib_bookingSlot from "../lib/bookingSlot.js";
 import type * as lib_hours from "../lib/hours.js";
 import type * as lib_ingest_helpers from "../lib/ingest_helpers.js";
 import type * as lib_vapiReport from "../lib/vapiReport.js";
@@ -54,6 +55,7 @@ declare const fullApi: ApiFromModules<{
   knowledgeChunks: typeof knowledgeChunks;
   leads: typeof leads;
   "lib/__fixtures__/vapiEndOfCallReport": typeof lib___fixtures___vapiEndOfCallReport;
+  "lib/bookingSlot": typeof lib_bookingSlot;
   "lib/hours": typeof lib_hours;
   "lib/ingest_helpers": typeof lib_ingest_helpers;
   "lib/vapiReport": typeof lib_vapiReport;
