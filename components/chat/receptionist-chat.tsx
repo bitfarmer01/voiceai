@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useChat } from "@ai-sdk/react";
+import { useVisitorKey } from "@/lib/hooks/use-visitor-key";
 import { DefaultChatTransport, isToolUIPart, type UIMessage } from "ai";
 import { ChatCircle, PaperPlaneTilt, X } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
@@ -26,10 +27,10 @@ export function ReceptionistChat({
   const [open, setOpen] = React.useState(false);
   const [input, setInput] = React.useState("");
 
-  // One stable session id per mounted widget (anchors any in-chat booking).
-  // React.useId() is pure and stable — avoids calling impure functions in render.
-  const reactId = React.useId();
-  const sessionId = `chat-${businessId}-${reactId}`;
+  // Globally-unique, persisted per-browser id (the same primitive the voice
+  // path uses) so two visitors never share a chat session or booking anchor.
+  const visitorKey = useVisitorKey();
+  const sessionId = visitorKey ? `chat-${businessId}-${visitorKey}` : "";
 
   const { messages, sendMessage, status, error } = useChat<UIMessage>({
     transport: new DefaultChatTransport({ api: "/api/chat" }),
@@ -37,7 +38,7 @@ export function ReceptionistChat({
 
   const send = () => {
     const text = input.trim();
-    if (!text) return;
+    if (!text || !sessionId) return;
     sendMessage(
       { text },
       { body: { businessId, businessName, knowledge, callerContext, sessionId } },
