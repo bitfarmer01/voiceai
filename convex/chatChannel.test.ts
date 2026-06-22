@@ -41,7 +41,7 @@ test("listRecentAnonymized and ownerStats.summary exclude channel:'chat' anchors
   );
 
   await t.run(async (ctx) => {
-    await ctx.db.insert("calls", baseCall({ businessId, channel: "voice", outcome: "booked", startedAt: 2000 }) as any);
+    await ctx.db.insert("calls", baseCall({ businessId, channel: "voice", outcome: "booked", startedAt: 2000, structuredData: { booking: { confirmationId: "v", slot: "2099-01-01T09:00", customerName: "V", contact: "v@v.co", bookedAt: 1 } } }) as any);
     await ctx.db.insert("calls", baseCall({ businessId, channel: "chat", startedAt: 3000, structuredData: { booking: { confirmationId: "x", slot: "2099-01-01T10:00", customerName: "Z", contact: "z@z.co", bookedAt: 1 } } }) as any);
   });
 

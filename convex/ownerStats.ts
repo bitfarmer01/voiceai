@@ -105,7 +105,7 @@ export const summary = query({
     let messagesLeft = 0;
 
     for (const c of ended) {
-      if (hasBooking(c.structuredData) || c.outcome === "booked") {
+      if (hasBooking(c.structuredData)) {
         appointmentsBooked += 1;
       } else if (c.outcome === "intent") {
         // Engaged caller, no appointment captured → an honest "message left".
