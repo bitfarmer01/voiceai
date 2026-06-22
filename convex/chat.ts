@@ -54,11 +54,11 @@ export const bookAppointment = mutation({
     }
 
     // Find-or-create the chat anchor for this session (so leads.callId resolves).
-    const existing = await ctx.db
+    let anchor = await ctx.db
       .query("calls")
       .withIndex("by_session", (q) => q.eq("sessionId", args.sessionId))
-      .collect();
-    const anchor = existing.find((c) => c.channel === "chat") ?? null;
+      .filter((q) => q.eq(q.field("channel"), "chat"))
+      .first();
     if (!anchor) {
       const now = Date.now();
       await ctx.db.insert("calls", {
