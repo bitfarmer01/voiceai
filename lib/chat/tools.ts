@@ -23,6 +23,12 @@ function convex(): ConvexHttpClient {
 export function buildChatTools(ctx: { businessId: string; sessionId: string }) {
   const businessId = ctx.businessId as Id<"businesses">;
 
+  // One ConvexHttpClient per request, created lazily on the first Convex-backed
+  // tool call — so the calculator-only path (and the env-free unit test) never
+  // constructs one, and a multi-tool turn reuses a single client.
+  let httpClient: ConvexHttpClient | null = null;
+  const client = () => (httpClient ??= convex());
+
   return {
     calculator: tool({
       description:
@@ -40,7 +46,7 @@ export function buildChatTools(ctx: { businessId: string; sessionId: string }) {
         query: z.string().describe("What the customer asked about"),
       }),
       execute: async ({ query }) =>
-        convex().query(api.chat.lookupKnowledge, { businessId, query }),
+        client().query(api.chat.lookupKnowledge, { businessId, query }),
     }),
 
     checkAvailability: tool({
@@ -52,7 +58,7 @@ export function buildChatTools(ctx: { businessId: string; sessionId: string }) {
         service: z.string().optional().describe("Optional requested service"),
       }),
       execute: async ({ date, preferredTime, service }) =>
-        convex().query(api.chat.checkAvailability, { businessId, date, preferredTime, service }),
+        client().query(api.chat.checkAvailability, { businessId, date, preferredTime, service }),
     }),
 
     bookAppointment: tool({
@@ -66,7 +72,7 @@ export function buildChatTools(ctx: { businessId: string; sessionId: string }) {
         notes: z.string().optional(),
       }),
       execute: async ({ slot, customerName, contact, service, notes }) => {
-        const res = await convex().mutation(api.chat.bookAppointment, {
+        const res = await client().mutation(api.chat.bookAppointment, {
           businessId,
           sessionId: ctx.sessionId,
           slot,
