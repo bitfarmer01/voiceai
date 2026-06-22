@@ -2,6 +2,39 @@
 
 Last updated: 2026-06-20 (deployed to Netlify via CLI — **LIVE at voiceai-receptionist.netlify.app**, on the dev Convex backend) · Branch: `feature/owner-reposition`
 
+## Receptionist text-twin chatbot widget — BUILT + PR #9 (2026-06-22, on `feat/chatbot-text-twin`)
+
+A floating **text-chat twin** of the voice receptionist on `/app/[slug]`, on the Vercel AI SDK
+(`ai@6` + new `@ai-sdk/react`). Brainstormed → spec'd → planned → built via subagent-driven-development
+(per-task spec+quality reviews + an opus whole-branch review). **PR:
+https://github.com/bitfarmer01/voiceai/pull/9** (base `fix/try-screen-layout-overflow`; I fast-forwarded
+origin's base from `648247d`→`07ecc6c` first so the PR shows only the 11 chatbot commits).
+Spec/plan: `docs/superpowers/{specs,plans}/2026-06-21-receptionist-text-twin-chatbot*.md`.
+
+- **Backend:** `app/api/chat/route.ts` (Node) runs `streamText` against **NVIDIA NIM** (`createOpenAI`,
+  `CHAT_MODEL` env, default `nvidia/nemotron-3-nano-30b-a3b`) with 4 tools, `toUIMessageStreamResponse()`.
+  Tools in `lib/chat/tools.ts` (per-request factory, lazy-memoized `ConvexHttpClient`): `calculator`
+  (pure `lib/chat/calculator.ts`, no eval), `lookupKnowledge`/`checkAvailability`/`bookAppointment` →
+  **public wrappers in `convex/chat.ts`** over the FROZEN `internal.tools.*`.
+- **Booking honesty:** chat booking persists onto a minimal **`channel:"chat"`** `calls` anchor (NEW
+  additive `calls.channel` field) excluded from `listRecentAnonymized` + `ownerStats.summary`. The opus
+  whole-branch review caught a CRITICAL: the frozen `bookAppointment` prefers `liveCall`, so a chat
+  booking made during a live voice call attached to the VOICE row. FIX: `convex/chat.ts` now validates
+  via NEW shared `convex/lib/bookingSlot.ts` (faithful extract of the frozen parse/validate) and writes
+  the lead+structuredData onto its OWN anchor — no longer delegates booking to the frozen tool.
+- **Widget:** `components/chat/receptionist-chat.tsx` — floating bubble + **non-modal** panel (`useChat`),
+  renders text + calculator chip + existing `<AppointmentCard>`. Per-browser session id via
+  **`useVisitorKey`** (NOT `useId` — that collides across visitors). Escape-to-close, safe-area/dvh/z-50/
+  Phosphor. Mounted in `app/(site)/app/[slug]/app-demo-client.tsx`.
+- **GOTCHA confirmed:** a VALUE import of `@/convex/_generated/api` FAILS under vitest (no `@/` alias) in
+  any file a test imports → `lib/chat/tools.ts` imports `api` via RELATIVE `../../convex/_generated/api`.
+- **Verified:** `pnpm typecheck` 0; feature suites green (calculator 8, system-prompt 5, tools 3, chat 5
+  incl. a live-voice-call regression test, chatChannel 1, bookingSlot 16). Full suite 301 pass / **3 fail
+  = PRE-EXISTING date-staleness in the FROZEN `convex/tools.test.ts`** (hardcoded 2026-06-21/22 slots now
+  past; not attributable — confirmed via git stash).
+- **PENDING (needs human):** live `/app/[slug]` smoke — add `NVIDIA_NIM_API_KEY` to the **Next/`.env.local`**
+  env (today only in Convex); confirm the NIM model does tool-calling (`CHAT_MODEL` swappable).
+
 > ⚠️ **Repo state (post-consolidation, 2026-06-19) — the old "uncommitted streams" gotchas are GONE:**
 > 1. **One branch is the source of truth:** `feature/owner-reposition` (local + `origin` in sync at `cd093d9`).
 >    EVERYTHING is committed — all prior uncommitted streams (Signal Bold UI, BYOD, call-end fix, dummy-data
