@@ -1,10 +1,20 @@
 import { convexTest } from "convex-test";
-import { describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import schema from "./schema";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 
 const modules = import.meta.glob("./**/*.ts");
+
+// Tests are written against June 2026 dates; pin "now" to Saturday 2026-06-20 so
+// they don't rot as the real clock moves. Only Date is faked (promises stay real).
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-06-20T12:00:00.000Z"));
+});
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 // The first preset the seed produces is Glow Dental
 // (hours "Mon–Fri 8:00–17:00, Sat 9:00–13:00"). Validation below is keyed to it.
