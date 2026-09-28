@@ -4,10 +4,10 @@
  * The shared, side-effect-free contract module imported widely across the
  * backend. It pins the shapes that cross integration seams:
  *   - the OTel span validator + type (mirrors lib/types.ts TraceSpan),
- *   - the three receptionist tool contracts (plan.md §5.1 / §6),
- *   - the budget/guard decision shape + constants (plan.md §5.4),
+ *   - the three receptionist tool contracts,
+ *   - the budget/guard decision shape + constants,
  *   - the engine-adapter seam (orchestrator boundary; v1 = VAPI),
- *   - the Fal.ai custom STT/TTS adapter contracts (plan.md §6).
+ *   - the Fal.ai custom STT/TTS adapter contracts.
  *
  * RULES (do not break):
  *   - Zero side effects. No top-level IO, no Date.now()/Math.random().
@@ -57,7 +57,7 @@ export const traceSpanValidator = v.object({
 export type TraceSpan = Infer<typeof traceSpanValidator>;
 
 // ════════════════════════════════════════════════════════════════════════════════
-// Receptionist tool contracts (plan.md §5.1 / §6)
+// Receptionist tool contracts
 // Each tool: an `*Args` (input) validator and a `*Result` (return) validator,
 // plus the matching TS types. The tool endpoints (httpActions) validate against
 // these; the VAPI assistantOverrides.tools schema is generated from them.
@@ -122,7 +122,7 @@ export const bookAppointmentArgs = v.object({
   notes: v.optional(v.string()),
   /**
    * Idempotency key so a retried tool-call cannot double-book
-   * (plan.md §8.6 "idempotent booking"). The caller passes the same key on retry.
+   * ("idempotent booking"). The caller passes the same key on retry.
    */
   idempotencyKey: v.optional(v.string()),
 });
@@ -149,7 +149,7 @@ export type ReceptionistToolName =
   (typeof RECEPTIONIST_TOOL_NAMES)[keyof typeof RECEPTIONIST_TOOL_NAMES];
 
 // ════════════════════════════════════════════════════════════════════════════════
-// Budget / guard contract (plan.md §5.4) — mirrors lib/types.ts GuardReason
+// Budget / guard contract — mirrors lib/types.ts GuardReason
 // ════════════════════════════════════════════════════════════════════════════════
 
 /** GuardReason = "ok" | "concurrency" | "visitor_cap" | "daily_budget" | "total_budget" */
@@ -194,7 +194,7 @@ export const canStartCallResult = v.object({
 export type CanStartCallResult = Infer<typeof canStartCallResult>;
 
 /**
- * Frozen budget constants (plan.md §5.4). The guard blocks if ANY limit is hit.
+ * Frozen budget constants. The guard blocks if ANY limit is hit.
  * Provider choice can never break the cap — accounting is on actual reported
  * cost and MAX_CALL_SECONDS bounds worst-case per call.
  */
@@ -214,7 +214,7 @@ export const BUDGET = {
 } as const;
 
 // ════════════════════════════════════════════════════════════════════════════════
-// Engine-adapter seam — the orchestrator boundary (plan.md §5 / §6).
+// Engine-adapter seam — the orchestrator boundary.
 // v1 implementation = VAPI. This is JUST the interface/types so a 2nd engine
 // (e.g. a self-hosted pipeline) can be slotted in later. No implementation here.
 // ════════════════════════════════════════════════════════════════════════════════
@@ -286,7 +286,7 @@ export interface VoiceEngineAdapter {
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
-// Custom STT/TTS adapter contracts — Fal.ai (plan.md §6).
+// Custom STT/TTS adapter contracts — Fal.ai.
 // VAPI custom-transcriber = websocket; custom-voice = HTTP. Types only; the
 // adapters are httpAction/Next endpoints that proxy Fal.ai-hosted models.
 // ════════════════════════════════════════════════════════════════════════════════
@@ -379,3 +379,45 @@ export interface FalCustomVoiceAdapter {
     req: CustomVoiceRequest,
   ): Promise<{ audio: ReadableStream<Uint8Array>; meta: CustomVoiceResponseMeta }>;
 }
+
+// ── Service intake questions (additive) ──────────────────────────────────────────
+// Closed-choice questions the receptionist asks per service before offering slots.
+export const intakeQuestionValidator = v.object({
+  id: v.string(),
+  prompt: v.string(),
+  options: v.array(v.string()),
+});
+export type IntakeQuestion = Infer<typeof intakeQuestionValidator>;
+
+export const serviceIntakeValidator = v.object({
+  service: v.string(),
+  questions: v.array(intakeQuestionValidator),
+});
+export type ServiceIntake = Infer<typeof serviceIntakeValidator>;
+
+export const intakeQuestionsValidator = v.array(serviceIntakeValidator);
+
+// ── Sample calendar (additive) ───────────────────────────────────────────────────
+export const appointmentSource = v.union(v.literal("sample"), v.literal("booked"));
+
+export const calendarSlotValidator = v.object({
+  /** "HH:mm" wall-clock. */
+  time: v.string(),
+  /** "mine" = the viewer's own booking (highlightLeadId match). */
+  status: v.union(v.literal("open"), v.literal("booked"), v.literal("mine")),
+  service: v.optional(v.string()),
+  /** Only ever set on the viewer's own booking. */
+  firstName: v.optional(v.string()),
+});
+
+export const calendarDayValidator = v.object({
+  date: v.string(),
+  open: v.boolean(),
+  slots: v.array(calendarSlotValidator),
+});
+
+export const calendarWindowResult = v.object({
+  hoursKnown: v.boolean(),
+  days: v.array(calendarDayValidator),
+});
+export type CalendarWindow = Infer<typeof calendarWindowResult>;

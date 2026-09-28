@@ -7,11 +7,13 @@ import type {
   SpanKind as ContractSpanKind,
   GuardReason as ContractGuardReason,
   EngineEndOfCallReport,
+  ServiceIntake as ContractServiceIntake,
 } from "../convex/_contracts";
 import type {
   TraceSpan as UiTraceSpan,
   SpanKind as UiSpanKind,
   GuardReason as UiGuardReason,
+  ServiceIntake as UiServiceIntake,
 } from "../lib/types";
 import {
   normalizeVapiEndOfCallReport,
@@ -24,6 +26,7 @@ test("_contracts mirrors lib/types (no drift)", () => {
   expectTypeOf<ContractTraceSpan>().toEqualTypeOf<UiTraceSpan>();
   expectTypeOf<ContractSpanKind>().toEqualTypeOf<UiSpanKind>();
   expectTypeOf<ContractGuardReason>().toEqualTypeOf<UiGuardReason>();
+  expectTypeOf<ContractServiceIntake>().toEqualTypeOf<UiServiceIntake>();
 });
 
 test("normalizer output IS an EngineEndOfCallReport", () => {

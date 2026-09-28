@@ -1,7 +1,7 @@
 /**
  * FROZEN DAY-0 CONTRACT — convex/schema.ts
  *
- * The authoritative table list for the VAPI voice-receptionist app (plan.md §10).
+ * The authoritative table list for the VAPI voice-receptionist app.
  * Field names and enums mirror lib/types.ts exactly so the frontend and backend
  * never drift (CallStatus, CallOutcome, ProviderKind, ProviderSource, SpanKind,
  * CostBreakdown, …). Every documented read path has a matching index — no
@@ -13,6 +13,7 @@
  */
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
+import { appointmentSource, intakeQuestionsValidator } from "./_contracts";
 
 // ── Shared enum validators (mirror lib/types.ts) ────────────────────────────────
 // CallStatus = "idle" | "connecting" | "live" | "ended"
@@ -62,7 +63,7 @@ const costBreakdown = v.object({
   platform: v.number(),
 });
 
-// QualityMetrics — plan.md §10 calls.qualityMetrics / §8.7
+// QualityMetrics — calls.qualityMetrics
 // sentiment is optional: Phase 3 computes the four deterministic metrics
 // client-side; sentiment needs a model call and is deferred to v1.1.
 const qualityMetrics = v.object({
@@ -73,18 +74,20 @@ const qualityMetrics = v.object({
   sentiment: v.optional(v.number()),
 });
 
-// Business profile — plan.md §5.1 / §10 businesses.profile
+// Business profile — businesses.profile
 const businessProfile = v.object({
   companyName: v.string(),
   hours: v.string(),
   services: v.array(v.string()),
   policies: v.array(v.string()),
   availability: v.string(),
+  // Per-service closed-choice intake questions (additive; absent = generic set).
+  intakeQuestions: v.optional(intakeQuestionsValidator),
 });
 
 export default defineSchema({
   // ── businesses ────────────────────────────────────────────────────────────────
-  // plan.md §10: kind preset|upload, ephemeral session-scoped with expiresAt.
+  // kind preset|upload, ephemeral session-scoped with expiresAt.
   businesses: defineTable({
     kind: v.union(v.literal("preset"), v.literal("upload"), v.literal("configured")),
     slug: v.optional(v.string()),
@@ -110,7 +113,7 @@ export default defineSchema({
     .index("by_slug", ["slug"]),
 
   // ── knowledgeChunks ───────────────────────────────────────────────────────────
-  // plan.md §5.1 / §10: FAQ/policy chunks; keyword search powers lookup_knowledge.
+  // FAQ/policy chunks; keyword search powers lookup_knowledge.
   knowledgeChunks: defineTable({
     businessId: v.id("businesses"),
     text: v.string(),
@@ -123,7 +126,7 @@ export default defineSchema({
     }),
 
   // ── calls ─────────────────────────────────────────────────────────────────────
-  // plan.md §10 + lib/types.ts CallSummary. costBreakdown, providers, languages,
+  // lib/types.ts CallSummary. costBreakdown, providers, languages,
   // structured booking + analysis live here.
   calls: defineTable({
     sessionId: v.string(),
@@ -167,7 +170,7 @@ export default defineSchema({
     .index("by_visitor", ["visitorKey"]),
 
   // ── spans ─────────────────────────────────────────────────────────────────────
-  // plan.md §5.3 / §10. OTel-shaped; traceId === callId. Mirror lib/types.ts
+  // OTel-shaped; traceId === callId. Mirror lib/types.ts
   // TraceSpan (and convex/_contracts.ts traceSpanValidator).
   spans: defineTable({
     traceId: v.string(),
@@ -185,7 +188,7 @@ export default defineSchema({
     .index("by_trace_span", ["traceId", "spanId"]),
 
   // ── logs ──────────────────────────────────────────────────────────────────────
-  // plan.md §5.3 / §10. Structured logs correlated by traceId.
+  // Structured logs correlated by traceId.
   logs: defineTable({
     traceId: v.string(),
     ts: v.number(),
@@ -200,7 +203,7 @@ export default defineSchema({
   }).index("by_trace", ["traceId"]),
 
   // ── transcriptTurns ───────────────────────────────────────────────────────────
-  // plan.md §10 + lib/types.ts TranscriptTurn.
+  // lib/types.ts TranscriptTurn.
   transcriptTurns: defineTable({
     callId: v.id("calls"),
     idx: v.number(),
@@ -212,7 +215,7 @@ export default defineSchema({
   }).index("by_call", ["callId"]),
 
   // ── voiceRatings ──────────────────────────────────────────────────────────────
-  // plan.md §10. "Rate this voice" ★ — feeds providerStats.avgRating.
+  // "Rate this voice" ★ — feeds providerStats.avgRating.
   voiceRatings: defineTable({
     callId: v.id("calls"),
     ttsProvider: v.string(),
@@ -224,7 +227,7 @@ export default defineSchema({
     .index("by_call", ["callId"]),
 
   // ── providerStats ─────────────────────────────────────────────────────────────
-  // plan.md §10 rollup + lib/types.ts ProviderStat. Updated async on call-end.
+  // Rollup + lib/types.ts ProviderStat. Updated async on call-end.
   providerStats: defineTable({
     provider: v.string(),
     kind: providerKind,
@@ -241,7 +244,6 @@ export default defineSchema({
     .index("by_provider", ["provider"]),
 
   // ── evalCases ─────────────────────────────────────────────────────────────────
-  // plan.md §8.3 / §10.
   evalCases: defineTable({
     name: v.string(),
     businessId: v.id("businesses"),
@@ -255,7 +257,7 @@ export default defineSchema({
   }).index("by_business", ["businessId"]),
 
   // ── evalRuns ──────────────────────────────────────────────────────────────────
-  // plan.md §8.3 / §10. Regression view across config changes.
+  // Regression view across config changes.
   evalRuns: defineTable({
     caseId: v.id("evalCases"),
     config: v.object({
@@ -274,7 +276,7 @@ export default defineSchema({
   }).index("by_case", ["caseId"]),
 
   // ── budgetState (singleton) ───────────────────────────────────────────────────
-  // plan.md §5.4 / §10. Authoritative spend, summed from VAPI reported cost.
+  // Authoritative spend, summed from VAPI reported cost.
   budgetState: defineTable({
     totalSpentUsd: v.number(),
     daySpentUsd: v.number(),
@@ -283,7 +285,7 @@ export default defineSchema({
   }),
 
   // ── visitorUsage ──────────────────────────────────────────────────────────────
-  // plan.md §5.4 / §10. Per-visitor daily call cap (VISITOR_CALL_CAP = 2).
+  // Per-visitor daily call cap (VISITOR_CALL_CAP = 2).
   visitorUsage: defineTable({
     visitorKey: v.string(),
     day: v.string(), // YYYY-MM-DD
@@ -291,7 +293,7 @@ export default defineSchema({
   }).index("by_visitor_day", ["visitorKey", "day"]),
 
   // ── leads ─────────────────────────────────────────────────────────────────────
-  // plan.md §8.7 / §10. Escalation / callback capture.
+  // Escalation / callback capture.
   leads: defineTable({
     callId: v.id("calls"),
     businessId: v.id("businesses"),
@@ -301,4 +303,22 @@ export default defineSchema({
   })
     .index("by_call", ["callId"])
     .index("by_business", ["businessId"]),
+
+  // ── appointments ──────────────────────────────────────────────────────────────
+  // One row per TAKEN 30-min slot. "sample" rows are the seeded demo calendar;
+  // "booked" rows are real bookings (leadId set). Open slots are the grid minus
+  // these rows. At most one row per (businessId, date, time) — enforced in the
+  // inserting mutation.
+  appointments: defineTable({
+    businessId: v.id("businesses"),
+    date: v.string(), // YYYY-MM-DD
+    time: v.string(), // HH:mm
+    source: appointmentSource,
+    leadId: v.optional(v.id("leads")),
+    service: v.optional(v.string()),
+    customerFirstName: v.optional(v.string()),
+  })
+    .index("by_business_date", ["businessId", "date"])
+    .index("by_business_slot", ["businessId", "date", "time"])
+    .index("by_date", ["date"]),
 });

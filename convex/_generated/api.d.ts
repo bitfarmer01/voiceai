@@ -22,6 +22,8 @@ import type * as lib___fixtures___vapiEndOfCallReport from "../lib/__fixtures__/
 import type * as lib_bookingSlot from "../lib/bookingSlot.js";
 import type * as lib_hours from "../lib/hours.js";
 import type * as lib_ingest_helpers from "../lib/ingest_helpers.js";
+import type * as lib_intake from "../lib/intake.js";
+import type * as lib_nim from "../lib/nim.js";
 import type * as lib_vapiReport from "../lib/vapiReport.js";
 import type * as lib_vapiWire from "../lib/vapiWire.js";
 import type * as lifecycle from "../lifecycle.js";
@@ -58,6 +60,8 @@ declare const fullApi: ApiFromModules<{
   "lib/bookingSlot": typeof lib_bookingSlot;
   "lib/hours": typeof lib_hours;
   "lib/ingest_helpers": typeof lib_ingest_helpers;
+  "lib/intake": typeof lib_intake;
+  "lib/nim": typeof lib_nim;
   "lib/vapiReport": typeof lib_vapiReport;
   "lib/vapiWire": typeof lib_vapiWire;
   lifecycle: typeof lifecycle;
