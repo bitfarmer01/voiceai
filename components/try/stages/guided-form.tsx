@@ -192,7 +192,11 @@ export function GuidedForm({
   const removeQuestion = (service: string, id: string) =>
     setEditIntake((prev) =>
       prev
-        .map((s) => (s.service === service ? { ...s, questions: s.questions.filter((q) => q.id !== id) } : s))
+        .map((s) =>
+          s.service.toLowerCase() === service.toLowerCase()
+            ? { ...s, questions: s.questions.filter((q) => q.id !== id) }
+            : s,
+        )
         .filter((s) => s.questions.length > 0),
     );
 
