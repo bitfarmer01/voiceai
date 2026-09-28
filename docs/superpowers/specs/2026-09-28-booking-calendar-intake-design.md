@@ -53,15 +53,17 @@ The table is new, so it doesn't touch any frozen field. It's mirrored in `convex
 - `schedule === null` (unparseable hours) → seed over the same `GENERIC_SLOTS` the degrade path uses, Mon–Fri.
 - Pure and clock-free (caller passes `fromDate`), so it's unit-testable.
 
-Callers — the top-up (`calendar.seedCalendar`, an idempotent insert-missing-only helper) runs from three places, so
-a stale calendar self-heals regardless of which path a business took:
+Callers — the top-up runs from three places, so a stale calendar self-heals regardless of which path a business
+took:
 
-- **On business creation** (preset seed, configured/guided, upload/ingest) — the creating mutation calls
-  `seedCalendar` directly, inserting missing `sample` rows for today…today+13.
-- **On voice `startCall`** (`convex/calls.ts`) — every live call re-tops-up its business's calendar before it starts.
-- **Daily cron** (`convex/crons.ts`, new) → `calendar.rollForward`: for every non-expired business, call the same
-  top-up and delete `sample` rows dated before today. Chat has no creation/start hook of its own, so it relies on
-  this cron. Idempotent: it only inserts missing slots, so re-runs are safe.
+- **On business creation** — the creating mutation calls `seedCalendar` directly (preset seed, upload/ingest),
+  inserting missing `sample` rows for today…today+13, or `resetSampleCalendar` — a wipe-and-reseed of `sample`
+  rows only, since the hours may have changed — for a configured/guided save (`upsertConfigured`). Booked rows
+  are never touched by either path.
+- **On voice `startCall`** (`convex/calls.ts`) — every live call calls `seedCalendar` directly before it starts.
+- **Daily cron** (`convex/crons.ts`, new) → `calendar.rollForward`: for every non-expired business, call
+  `seedCalendar` and delete `sample` rows dated before today. Chat has no creation/start hook of its own, so it
+  relies on this cron. Idempotent: `seedCalendar` only inserts missing slots, so re-runs are safe.
 
 ### `check_availability` (`convex/tools.ts`)
 
@@ -177,7 +179,7 @@ Props: `{ businessId, highlightLeadId?, offeredSlots?, ownerView? }`. Data comes
 | Nothing open for 14 days | Availability returns empty + note; the script falls back to taking a message |
 | Unparseable hours | Seeded on generic slots; availability and booking still subtract taken slots; UI note |
 | Drafted questions invalid | Dropped for that service; the generic set is used |
-| Cron missed a day | Harmless — the same idempotent top-up also runs on business creation and on voice `startCall`; only chat relies solely on the cron |
+| Cron missed a day | Harmless — the same top-up (`seedCalendar`, or `resetSampleCalendar` for a configured/guided save) also runs on business creation and on voice `startCall`; only chat relies solely on the cron |
 
 ## Testing
 
