@@ -81,64 +81,118 @@ describe("lookup_knowledge", () => {
   });
 });
 
+async function takeSlot(
+  t: ReturnType<typeof convexTest>,
+  businessId: Id<"businesses">,
+  date: string,
+  time: string,
+): Promise<void> {
+  await t.run(async (ctx) => {
+    await ctx.db.insert("appointments", { businessId, date, time, source: "sample" });
+  });
+}
+
 describe("check_availability", () => {
-  test("returns REAL slots within the open window on a weekday", async () => {
+  // Glow: Mon–Fri 08:00–17:00, Sat 09:00–13:00, closed Sunday. 2026-06-22 is a Monday.
+  test("returns the two soonest open slots as full 'YYYY-MM-DD HH:mm' strings", async () => {
     const t = convexTest(schema, modules);
     const businessId = await seededBusinessId(t);
-    // 2026-06-22 is a Monday → Glow open 08:00–17:00.
-    const res = await t.query(internal.tools.checkAvailability, {
-      businessId,
-      date: "2026-06-22",
-    });
+    const res = await t.query(internal.tools.checkAvailability, { businessId, date: "2026-06-22" });
     expect(res.available).toBe(true);
-    expect(res.slots.length).toBeGreaterThan(0);
-    // Real slots start at the open time (08:00), not the old fictional 09:00.
-    expect(res.slots[0]).toBe("08:00");
+    expect(res.date).toBe("2026-06-22");
+    expect(res.slots).toEqual(["2026-06-22 08:00", "2026-06-22 08:30"]);
   });
 
-  test("is closed on Sunday with a note naming the real hours", async () => {
+  test("skips slots already on the calendar", async () => {
     const t = convexTest(schema, modules);
     const businessId = await seededBusinessId(t);
-    // 2026-06-14 is a Sunday — Glow never lists Sunday → closed.
+    await takeSlot(t, businessId, "2026-06-22", "08:00");
+    const res = await t.query(internal.tools.checkAvailability, { businessId, date: "2026-06-22" });
+    expect(res.slots).toEqual(["2026-06-22 08:30", "2026-06-22 09:00"]);
+  });
+
+  test("honors a part-of-day preference", async () => {
+    const t = convexTest(schema, modules);
+    const businessId = await seededBusinessId(t);
     const res = await t.query(internal.tools.checkAvailability, {
       businessId,
-      date: "2026-06-14",
+      date: "2026-06-22",
+      preferredTime: "afternoon",
     });
-    expect(res.available).toBe(false);
-    expect(res.slots).toHaveLength(0);
-    expect(res.note).toMatch(/Sunday/i);
+    expect(res.slots).toEqual(["2026-06-22 12:00", "2026-06-22 12:30"]);
   });
 
-  test("honors a preferredTime only when it falls inside the open window", async () => {
+  test("a closed day returns next-open-day alternatives with a note naming the closure", async () => {
     const t = convexTest(schema, modules);
     const businessId = await seededBusinessId(t);
-    // Monday, Glow 08:00–17:00. 10:00 is in-window → surfaced first.
-    const inHours = await t.query(internal.tools.checkAvailability, {
-      businessId,
-      date: "2026-06-22",
-      preferredTime: "10:00",
-    });
-    expect(inHours.slots[0]).toBe("10:00");
+    const res = await t.query(internal.tools.checkAvailability, { businessId, date: "2026-06-21" });
+    expect(res.available).toBe(true);
+    expect(res.date).toBe("2026-06-22");
+    expect(res.slots[0]).toBe("2026-06-22 08:00");
+    expect(res.note).toMatch(/closed Sunday/i);
+    expect(res.note).toMatch(/Next open: 2026-06-22/);
+  });
 
-    // 20:00 is outside the window → NOT surfaced; real slots returned instead.
-    const outOfHours = await t.query(internal.tools.checkAvailability, {
-      businessId,
-      date: "2026-06-22",
-      preferredTime: "20:00",
-    });
-    expect(outOfHours.slots).not.toContain("20:00");
-    expect(outOfHours.slots[0]).toBe("08:00");
+  test("a fully booked day rolls to the next day", async () => {
+    const t = convexTest(schema, modules);
+    const businessId = await seededBusinessId(t);
+    for (let m = 8 * 60; m < 17 * 60; m += 30) {
+      const hh = String(Math.floor(m / 60)).padStart(2, "0");
+      await takeSlot(t, businessId, "2026-06-22", `${hh}:${m % 60 === 0 ? "00" : "30"}`);
+    }
+    const res = await t.query(internal.tools.checkAvailability, { businessId, date: "2026-06-22" });
+    expect(res.slots[0]).toBe("2026-06-23 08:00");
+    expect(res.note).toMatch(/Nothing open on 2026-06-22/);
+  });
+
+  test("excludes times already past today", async () => {
+    vi.setSystemTime(new Date("2026-06-22T10:10:00.000Z"));
+    const t = convexTest(schema, modules);
+    const businessId = await seededBusinessId(t);
+    const res = await t.query(internal.tools.checkAvailability, { businessId, date: "2026-06-22" });
+    expect(res.slots[0]).toBe("2026-06-22 10:30");
+  });
+
+  test("unparseable hours still subtract taken slots and say the times are examples", async () => {
+    const t = convexTest(schema, modules);
+    const businessId = await t.run(async (ctx) =>
+      ctx.db.insert("businesses", {
+        kind: "configured",
+        name: "Vague Co",
+        profile: { companyName: "Vague Co", hours: "call us to check", services: [], policies: [], availability: "" },
+        chunkCount: 0,
+        createdAt: Date.now(),
+      }),
+    );
+    await takeSlot(t, businessId, "2026-06-22", "09:00");
+    const res = await t.query(internal.tools.checkAvailability, { businessId, date: "2026-06-22" });
+    expect(res.slots).toEqual(["2026-06-22 11:30", "2026-06-22 14:00"]);
+    expect(res.note).toMatch(/example times/i);
   });
 
   test("guards the NaN/bad-date case", async () => {
     const t = convexTest(schema, modules);
     const businessId = await seededBusinessId(t);
-    const res = await t.query(internal.tools.checkAvailability, {
-      businessId,
-      date: "not-a-date",
-    });
+    const res = await t.query(internal.tools.checkAvailability, { businessId, date: "not-a-date" });
     expect(res.available).toBe(false);
-    expect(res.slots).toHaveLength(0);
+    expect(res.slots).toEqual([]);
+  });
+});
+
+describe("patchOfferedSlots", () => {
+  test("records the offered slots on the live voice call only", async () => {
+    const t = convexTest(schema, modules);
+    const businessId = await seededBusinessId(t);
+    const callId = await liveCallFor(t, businessId);
+    await t.mutation(internal.calls.patchOfferedSlots, {
+      businessId,
+      slots: ["2026-06-22 08:00", "2026-06-22 08:30"],
+    });
+    const call = await t.run(async (ctx) => ctx.db.get(callId));
+    expect((call?.structuredData as { offeredSlots?: string[] }).offeredSlots).toEqual([
+      "2026-06-22 08:00",
+      "2026-06-22 08:30",
+    ]);
   });
 });
 

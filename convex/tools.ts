@@ -1,5 +1,5 @@
 /**
- * Wave A — Receptionist tool logic (plan.md §5.1 / §6).
+ * Wave A — Receptionist tool logic.
  *
  * The three tools the VAPI assistant can call mid-call. These are the INTERNAL
  * implementations; the public-facing surface is the httpActions in http.ts,
@@ -7,7 +7,7 @@
  * log after.
  *
  *   - lookupKnowledge   — keyword search over the business's chunks (internalQuery)
- *   - checkAvailability — REAL slots from the parsed business hours (internalQuery)
+ *   - checkAvailability — the 2 soonest OPEN slots (hours grid minus the appointments calendar)
  *   - bookAppointment   — structured booking, VALIDATED against hours (internalMutation)
  *
  * All reads go through indexes / the search index — no `.filter()` for WHERE.
@@ -30,18 +30,16 @@ import {
   parseHours,
   isOpenOn,
   isWithinHours,
-  slotsFor,
   describeDay,
   parseTimeToken,
   toHHMM,
   type WeeklySchedule,
 } from "./lib/hours";
+import { CALENDAR_DAYS, dayGrid } from "./lib/calendarSeed";
+import { nextOpenSlots } from "./lib/availability";
+import { loadTaken } from "./calendar";
 
 const DEFAULT_KNOWLEDGE_LIMIT = 4;
-
-// Generic fallback slots used ONLY on the degrade path (hours unparseable).
-// Same shape the old implementation always returned.
-const GENERIC_SLOTS = ["09:00", "11:30", "14:00", "16:30"];
 
 // ── lookup_knowledge ──────────────────────────────────────────────────────────
 export const lookupKnowledge = internalQuery({
@@ -133,80 +131,61 @@ function isPastSlot(date: string, time: string | undefined, nowMs: number): bool
 
 // ── check_availability ────────────────────────────────────────────────────────
 //
-// Parse the business hours and return REAL slots within the open window. On a
-// closed day → available:false, slots:[], note naming the real hours. When the
-// hours text can't be parsed → degrade: generic slots + a transparent note.
+// The two soonest OPEN "YYYY-MM-DD HH:mm" slots: the hours grid minus the
+// appointments calendar, from the requested date forward (14-day horizon),
+// honoring a part-of-day / clock-time preference. A closed or full day rolls
+// forward with a note that says why. Unparseable hours → generic grid + an
+// honest "example times" note (taken slots are still subtracted).
 export const checkAvailability = internalQuery({
   args: checkAvailabilityArgs,
   returns: checkAvailabilityResult,
   handler: async (ctx, args) => {
     const business = await ctx.db.get(args.businessId);
     if (!business) {
-      return {
-        available: false,
-        date: args.date,
-        slots: [],
-        note: "Business not found.",
-      };
+      return { available: false, date: args.date, slots: [], note: "Business not found." };
     }
-
-    // `args.date` is YYYY-MM-DD; guard the NaN-date case first (preserved).
     if (!isValidYmd(args.date)) {
-      return {
-        available: false,
-        date: args.date,
-        slots: [],
-        note: "Could not parse the requested date.",
-      };
+      return { available: false, date: args.date, slots: [], note: "Could not parse the requested date." };
     }
 
+    const now = Date.now();
     const hoursText = business.profile.hours;
     const schedule: WeeklySchedule | null = parseHours(hoursText);
+    const taken = await loadTaken(ctx, args.businessId, args.date, CALENDAR_DAYS);
+    const slots = nextOpenSlots({
+      grid: (d) => dayGrid(schedule, d),
+      taken,
+      fromDate: args.date,
+      preferredTime: args.preferredTime,
+      nowMs: now,
+    });
 
-    // ── Degrade path: hours unparseable → don't hard-block, just be honest.
-    if (!schedule) {
-      const slots = args.preferredTime
-        ? [args.preferredTime, ...GENERIC_SLOTS.filter((s) => s !== args.preferredTime)].slice(0, 4)
-        : GENERIC_SLOTS;
-      return {
-        available: true,
-        date: args.date,
-        slots,
-        note: `These are example times — we couldn't verify them against the posted hours${hoursText ? ` ("${hoursText}")` : ""}. Please confirm when you call.`,
-      };
+    const notes: string[] = [];
+    if (args.service) notes.push(`Availability for ${args.service}.`);
+
+    if (slots.length === 0) {
+      notes.push("No open times in the next two weeks. Offer to take a message.");
+      return { available: false, date: args.date, slots: [], note: notes.join(" ") };
     }
 
-    const dow = new Date(`${args.date}T00:00:00.000Z`).getUTCDay();
-
-    // ── Closed day: name the real hours so the caller knows when we ARE open.
-    if (!isOpenOn(schedule, args.date)) {
-      return {
-        available: false,
-        date: args.date,
-        slots: [],
-        note: `We're ${describeDay(schedule, dow)} that day. Posted hours: ${hoursText}`,
-      };
+    const firstDate = slots[0].slice(0, 10);
+    if (firstDate !== args.date) {
+      if (schedule && !isOpenOn(schedule, args.date)) {
+        const dow = new Date(`${args.date}T00:00:00.000Z`).getUTCDay();
+        notes.push(`We're ${describeDay(schedule, dow)} on ${args.date}.`);
+      } else {
+        notes.push(`Nothing open on ${args.date}${args.preferredTime ? ` for "${args.preferredTime}"` : ""}.`);
+      }
+      notes.push(`Next open: ${firstDate}.`);
     }
+    notes.push("Offer exactly these times as a choice.");
+    notes.push(
+      schedule
+        ? `Posted hours: ${hoursText}`
+        : `These are example times — we couldn't verify them against the posted hours${hoursText ? ` ("${hoursText}")` : ""}. Please confirm when you call.`,
+    );
 
-    // ── Open day: REAL slots within the window.
-    const realSlots = slotsFor(schedule, args.date, { stepMin: 30, max: 4 });
-
-    // Honor a preferred time only if it actually falls within the open window.
-    let slots = realSlots;
-    if (args.preferredTime && isWithinHours(schedule, args.date, args.preferredTime)) {
-      slots = [
-        args.preferredTime,
-        ...realSlots.filter((s) => s !== args.preferredTime),
-      ].slice(0, 4);
-    }
-
-    const serviceNote = args.service ? `Availability for ${args.service}. ` : "";
-    return {
-      available: slots.length > 0,
-      date: args.date,
-      slots,
-      note: `${serviceNote}${describeDay(schedule, dow)}. Posted hours: ${hoursText}`,
-    };
+    return { available: true, date: firstDate, slots, note: notes.join(" ") };
   },
 });
 

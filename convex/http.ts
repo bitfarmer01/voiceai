@@ -1,5 +1,5 @@
 /**
- * Wave A — HTTP surface (plan.md §5.2 / §5.3 / §6).
+ * Wave A — HTTP surface.
  *
  * VAPI talks to us over HTTP:
  *   - POST /vapi/webhook           — lifecycle + end-of-call report (cost/latency).
@@ -199,6 +199,15 @@ const checkAvailabilityTool = httpAction(async (ctx, request) => {
     preferredTime: asString(args.preferredTime),
     service: asString(args.service),
   });
+
+  // Best-effort: let the calendar ring the offered slots. Never blocks the tool.
+  if (result.slots.length > 0) {
+    try {
+      await ctx.runMutation(internal.calls.patchOfferedSlots, { businessId, slots: result.slots });
+    } catch (e) {
+      console.error("check_availability: patchOfferedSlots failed", e);
+    }
+  }
 
   return toolResponse(toolCallId, result);
 });
