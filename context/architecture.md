@@ -136,7 +136,7 @@ Public surface = `api.*`; internal-only = `internal.*`. **`"use node"`** modules
 | `budget.ts`               | V8      | `getPublicState`; idempotent `recordCostOnce` / `releaseConcurrencyOnce` helpers                       |
 | `tools.ts`                | V8      | FROZEN receptionist tools: `lookupKnowledge` (internalQuery); `checkAvailability` (internalQuery) — the 2 soonest open `"YYYY-MM-DD HH:mm"` slots (hours grid minus the `appointments` calendar); `bookAppointment` (internalMutation) — requires a concrete time, atomically claims the slot in the same mutation as the lead, rejects an already-taken slot with 2 alternatives |
 | `chat.ts`                 | V8      | PUBLIC chat wrappers over `internal.tools.*`; `bookAppointment` find-or-creates a `channel:"chat"` anchor and validates the slot directly (does NOT delegate booking — the frozen tool would mis-attach to a live voice call) |
-| `calendar.ts`              | V8      | The sample-calendar module shared by `tools.ts` + `chat.ts`: `slotKey`/`loadTaken`/`isSlotTaken`/`insertBookedAppointment`/`takenMessage` (plain helpers), `seedCalendar`/`resetSampleCalendar` (idempotent top-up), `ensureSeeded` (internalMutation wrapper), `rollForward` (internalMutation; the cron target — prunes past `sample` rows, tops up every non-expired business), `getWindow` (public query — the reactive grid `<AvailabilityCalendar>` subscribes to) |
+| `calendar.ts`              | V8      | The sample-calendar module shared by `tools.ts` + `chat.ts`: `slotKey`/`loadTaken`/`isSlotTaken`/`insertBookedAppointment`/`takenMessage` (plain helpers), `seedCalendar` (idempotent top-up — inserts missing sample rows, never touches booked rows) and `resetSampleCalendar` (wipes every `sample` row for a business and calls `seedCalendar` to reseed — used by `upsertConfigured` when hours change), `ensureSeeded` (internalMutation wrapper), `rollForward` (internalMutation; the cron target — prunes past `sample` rows, tops up every non-expired business), `getWindow` (public query — the reactive grid `<AvailabilityCalendar>` subscribes to) |
 | `http.ts`                 | V8      | The VAPI HTTP surface (`/vapi/webhook` + `/tools/*`) — see below                                       |
 | `businesses.ts`           | V8      | `listPresets`, `getWithChunks` (nested `{_id, name, profile, chunks}`), `getBySlug`, upload-url + `insertUploadedBusiness` (internal) |
 | `knowledgeChunks.ts`      | V8      | `listForBusiness`                                                                                       |
@@ -300,3 +300,21 @@ Rules the agent must never violate:
 - **Calendar PII** — a first name (`customerFirstName`) is stored on every booked row but is only ever returned to
   the client when `highlightLeadId` matches that row's `leadId` (the viewer's own booking). There's no auth, so
   this is the only thing standing between one caller and another caller's name.
+- **Off-grid slot rejection** — `bookAppointment` (voice and chat) rejects a requested time that isn't one of
+  `dayGrid`'s 30-min slots — even when it falls inside the open-hours window (e.g. `09:15` when the grid is
+  `09:00`/`09:30`) or on a day the degrade-path `GENERIC_SLOTS` grid doesn't cover (e.g. Saturday) — with a
+  message naming the two nearest bookable alternatives. Otherwise it would silently write an appointment row
+  that `getWindow`/`checkAvailability` (both grid-driven) can never surface, and could double-book a grid slot
+  from underneath it.
+
+### Known limitations
+
+- **Wall-clock is UTC-only, per business** — "today" and slot times are computed/stored at face value with no
+  business timezone, so same-day availability (what counts as "past") is skewed for a non-UTC business. Future:
+  an optional per-business timezone field.
+- **`rollForward` doesn't scale past demo size** — it's a single daily mutation that scans every past
+  `appointments` row and every `businesses` row in one transaction. Fine at demo scale; before public traffic it
+  must be paginated or fanned out (e.g. per-business scheduled work) instead of one unbounded scan.
+- **Existing businesses need one manual `rollForward` after deploy** — a business created before this feature
+  shipped has no calendar rows until `calendar:rollForward` runs once (either by hand or by waiting for the next
+  cron tick); run it once after deploying so every existing business has a calendar before the first cron fires.
