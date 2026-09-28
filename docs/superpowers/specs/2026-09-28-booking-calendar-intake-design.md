@@ -1,6 +1,6 @@
 # Booking calendar + service-driven intake — design
 
-**Date:** 2026-09-28 · **Branch:** feat/chatbot-text-twin · **Status:** awaiting review
+**Date:** 2026-09-28 · **Branch:** feat/chatbot-text-twin · **Status:** implemented
 
 ## Goal
 
@@ -53,12 +53,15 @@ The table is new, so it doesn't touch any frozen field. It's mirrored in `convex
 - `schedule === null` (unparseable hours) → seed over the same `GENERIC_SLOTS` the degrade path uses, Mon–Fri.
 - Pure and clock-free (caller passes `fromDate`), so it's unit-testable.
 
-Callers:
+Callers — the top-up (`calendar.seedCalendar`, an idempotent insert-missing-only helper) runs from three places, so
+a stale calendar self-heals regardless of which path a business took:
 
-- **On business creation** (preset seed, configured/guided, upload/ingest) → an internal mutation
-  `calendar.ensureSeeded({ businessId })` inserts missing `sample` rows for today…today+13.
+- **On business creation** (preset seed, configured/guided, upload/ingest) — the creating mutation calls
+  `seedCalendar` directly, inserting missing `sample` rows for today…today+13.
+- **On voice `startCall`** (`convex/calls.ts`) — every live call re-tops-up its business's calendar before it starts.
 - **Daily cron** (`convex/crons.ts`, new) → `calendar.rollForward`: for every non-expired business, call the same
-  top-up and delete `sample` rows dated before today. Idempotent: it only inserts missing slots, so re-runs are safe.
+  top-up and delete `sample` rows dated before today. Chat has no creation/start hook of its own, so it relies on
+  this cron. Idempotent: it only inserts missing slots, so re-runs are safe.
 
 ### `check_availability` (`convex/tools.ts`)
 
@@ -89,15 +92,18 @@ Callers:
 
 This is an optional addition to the frozen `businessProfile`. It's mirrored in `_contracts.ts` and `lib/types.ts`.
 
-Limits, enforced by a validator in `convex/lib/intake.ts`: 2–3 questions per service, 2–4 options per question,
-each option ≤ 40 characters, a service must match an entry in `profile.services`, and any extra is trimmed.
+Limits, enforced by a validator in `convex/lib/intake.ts`: 1–3 questions per service, 2–4 options per question,
+each option ≤ 40 characters, a service must match an entry in `profile.services`, and any extra is trimmed. The
+generic fallback set (`GENERIC_INTAKE`) has a single question.
 
 ### Sources
 
 - **Guided / configured businesses:** the existing LLM drafting step (`convex/lib/nim.ts` / `convex/sources.ts`)
   also returns `intakeQuestions`. Output that fails validation is dropped per service. That service then uses the
   generic set.
-- **Glow Dental preset:** hand-authored in `lib/data/presets.ts` / `convex/seedPresets.ts`.
+- **Glow Dental preset:** hand-authored in `lib/data/presets.ts`, which is what the demo voice call reads. The
+  Convex Glow Dental row seeded by `convex/seedPresets.ts` uses different service names and carries no
+  `intakeQuestions` — no prompt reads it.
 - **Upload / link / paste businesses:** drafted during ingest the same way.
 - **Generic fallback** (missing, invalid, or legacy businesses): "Is this your first visit, or have you been in
   before?" → First visit / Returning.
@@ -135,13 +141,14 @@ Props: `{ businessId, highlightLeadId?, offeredSlots?, ownerView? }`. Data comes
   time. Previous/next arrows move across the 14 days. **Mobile:** day `Tabs`, each with a slot list.
 - **States** (theme tokens only — no hex, gradients, or glow):
   - **Open:** paper background with an ink outline.
-  - **Booked (sample):** muted fill, labeled "Booked".
+  - **Booked (sample or real):** muted fill, labeled "Booked".
   - **Just booked** (`highlightLeadId`): the single amber accent, labeled with first name and service.
   - **Offered:** a quiet ring.
-  - **Closed day:** hatched, labeled "Closed".
-- **Owner view** also shows first name and service on booked slots. The caller view shows only "Booked" for other
-  people's slots.
-- **Motion:** only a ≤150ms opacity fade when a slot changes state, and none under `prefers-reduced-motion`.
+  - **Closed day:** a muted fill (`bg-muted/40`), labeled "Closed" — no hatching (would need a gradient, which
+    Signal Bold forbids).
+- **Owner view** also shows the service on booked slots — there's no auth, so no other customer's name is ever
+  shown. A first name appears **only** on the viewer's own booking (`highlightLeadId` match), in both views.
+- **Motion:** none. UI rules say no animation unless requested.
 - **Accessibility:** cells are non-interactive, each with an `aria-label` ("Tuesday 10:00, booked").
   Numbers use `tabular-nums`. Read-only — no click-to-book.
 - **Loading / error:** `components/states/*` skeleton and error. Unparseable hours → an inline note,
@@ -150,8 +157,9 @@ Props: `{ businessId, highlightLeadId?, offeredSlots?, ownerView? }`. Data comes
 ### Offered-slot highlight
 
 - **Chat:** read from the latest `checkAvailability` tool result in `useChat` messages.
-- **Voice:** `check_availability` writes an optional `offeredSlots: v.optional(v.array(v.string()))` onto the active
-  call (an additive field on `calls`). The client reads it through the existing call subscription.
+- **Voice:** `check_availability` best-effort patches the two offered slots onto the live call's existing
+  `structuredData.offeredSlots` (`calls.patchOfferedSlots`, internal). `structuredData` is already `v.any()`, so
+  the frozen `calls` table needs no new field. The client reads it through the existing call subscription.
 
 ### Placement
 
@@ -169,7 +177,7 @@ Props: `{ businessId, highlightLeadId?, offeredSlots?, ownerView? }`. Data comes
 | Nothing open for 14 days | Availability returns empty + note; the script falls back to taking a message |
 | Unparseable hours | Seeded on generic slots; availability and booking still subtract taken slots; UI note |
 | Drafted questions invalid | Dropped for that service; the generic set is used |
-| Cron missed a day | Harmless — `ensureSeeded` also runs when a call or chat session starts (a mutation), as an idempotent top-up |
+| Cron missed a day | Harmless — the same idempotent top-up also runs on business creation and on voice `startCall`; only chat relies solely on the cron |
 
 ## Testing
 
