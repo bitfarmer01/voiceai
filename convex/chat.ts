@@ -24,6 +24,8 @@ import {
 } from "./_contracts";
 import { validateSlot } from "./lib/bookingSlot";
 import { isSlotTaken, insertBookedAppointment, takenMessage } from "./calendar";
+import { parseHours } from "./lib/hours";
+import { dayGrid } from "./lib/calendarSeed";
 
 export const lookupKnowledge = query({
   args: lookupKnowledgeArgs,
@@ -98,7 +100,10 @@ export const bookAppointment = mutation({
     }
 
     // Idempotency: a retried booking with the same session+slot is a no-op.
-    const idempotencyKey = `${args.sessionId}:${args.slot}`;
+    // Keyed on the PARSED date+time (not the raw slot text) so the same slot
+    // re-sent in a different format ("...T10:00" vs "... 10:00") is still
+    // recognized as the caller's own booking rather than "already taken".
+    const idempotencyKey = `${args.sessionId}:${v2.date} ${v2.time}`;
     const existingLeads = await ctx.db
       .query("leads")
       .withIndex("by_call", (q) => q.eq("callId", anchor._id))
@@ -108,6 +113,17 @@ export const bookAppointment = mutation({
     );
     if (prior) {
       return { booked: true, confirmationId: prior._id, slot: args.slot, icsUrl: `/api/ics/${prior._id}`, message: "Appointment already booked (idempotent retry)." };
+    }
+
+    // Off-grid guard: see convex/tools.ts for why isWithinHours alone isn't
+    // enough — the time must also land on the 30-min grid the calendar renders.
+    if (!dayGrid(parseHours(business.profile.hours), v2.date).includes(v2.time)) {
+      return {
+        booked: false,
+        confirmationId: "",
+        slot: args.slot,
+        message: await takenMessage(ctx, business, v2.date, v2.time, now, "off-grid"),
+      };
     }
 
     if (await isSlotTaken(ctx, args.businessId, v2.date, v2.time)) {

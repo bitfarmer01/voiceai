@@ -332,8 +332,60 @@ describe("book_appointment — validation against real hours", () => {
       contact: "sam@example.com",
     });
     expect(res.booked).toBe(false);
+    expect(res.message).toMatch(/specific times/);
     const leads = await t.run((ctx) => ctx.db.query("leads").collect());
     expect(leads).toHaveLength(0);
+  });
+
+  test("rejects an off-grid time even though it falls within hours, and persists nothing", async () => {
+    const t = convexTest(schema, modules);
+    const businessId = await seededBusinessId(t);
+    await liveCallFor(t, businessId);
+
+    // 2026-06-22 (Monday) 09:15 — inside Glow's 08:00-17:00 window but not on
+    // the 30-min grid (08:00, 08:30, 09:00, 09:30, ...).
+    const res = await t.mutation(internal.tools.bookAppointment, {
+      businessId,
+      slot: "2026-06-22 09:15",
+      customerName: "Sam Lee",
+      contact: "sam@example.com",
+    });
+    expect(res.booked).toBe(false);
+    expect(res.message).toContain("2026-06-22 09:30 or 2026-06-22 10:00");
+
+    const leads = await t.run((ctx) => ctx.db.query("leads").collect());
+    expect(leads).toHaveLength(0);
+    const rows = await t.run((ctx) => ctx.db.query("appointments").collect());
+    expect(rows).toHaveLength(0);
+  });
+
+  test("rejects an off-grid time on a day with unparseable hours (degrade path)", async () => {
+    const t = convexTest(schema, modules);
+    const businessId = await t.run(async (ctx) =>
+      ctx.db.insert("businesses", {
+        kind: "configured",
+        name: "Vague Co",
+        profile: { companyName: "Vague Co", hours: "call us to check", services: [], policies: [], availability: "" },
+        chunkCount: 0,
+        createdAt: Date.now(),
+      }),
+    );
+    await liveCallFor(t, businessId);
+
+    // 2026-06-27 is a Saturday — the degrade-path grid (GENERIC_SLOTS) is
+    // weekdays only, so no time on a Saturday is a bookable slot.
+    const res = await t.mutation(internal.tools.bookAppointment, {
+      businessId,
+      slot: "2026-06-27 10:00",
+      customerName: "Test Caller",
+      contact: "test@example.com",
+    });
+    expect(res.booked).toBe(false);
+
+    const leads = await t.run((ctx) => ctx.db.query("leads").collect());
+    expect(leads).toHaveLength(0);
+    const rows = await t.run((ctx) => ctx.db.query("appointments").collect());
+    expect(rows).toHaveLength(0);
   });
 
   test("writes a booked appointment row on success", async () => {

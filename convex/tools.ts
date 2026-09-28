@@ -139,13 +139,14 @@ export const checkAvailability = internalQuery({
 // `idempotencyKey` makes a retried tool-call a no-op double-book.
 //
 // VALIDATION: the requested slot must carry a concrete time, is validated
-// against the parsed hours, and must still be free on the calendar. A past
-// datetime, a closed day, a time outside the open window, an unreadable or
-// date-only slot, or a slot the calendar already holds is rejected
-// (booked:false + a plain-language message, NOTHING written) — a taken slot's
-// message names the two nearest open alternatives. When the hours can't be
-// parsed we degrade-open and book it with a transparent note rather than
-// blocking a real customer.
+// against the parsed hours, must land on the bookable 30-min grid (dayGrid —
+// not just "within hours"), and must still be free on the calendar. A past
+// datetime, a closed day, a time outside the open window, an off-grid time,
+// an unreadable or date-only slot, or a slot the calendar already holds is
+// rejected (booked:false + a plain-language message, NOTHING written) — a
+// taken/off-grid slot's message names the two nearest open alternatives. When
+// the hours can't be parsed we degrade-open and book it with a transparent
+// note rather than blocking a real customer.
 export const bookAppointment = internalMutation({
   args: bookAppointmentArgs,
   returns: bookAppointmentResult,
@@ -211,6 +212,20 @@ export const bookAppointment = internalMutation({
           message: "Appointment already booked (idempotent retry).",
         };
       }
+    }
+
+    // Off-grid guard: a time can satisfy the hours window (isWithinHours) but
+    // still miss the 30-min grid the calendar actually renders/searches (e.g.
+    // "09:15") — book it anyway and it becomes an invisible row that
+    // getWindow/nextOpenSlots never surface, and on the degrade-path grid it
+    // would accept any time on a day the generic grid doesn't cover at all.
+    if (!dayGrid(parseHours(business.profile.hours), check.date).includes(check.time)) {
+      return {
+        booked: false,
+        confirmationId: "",
+        slot: args.slot,
+        message: await takenMessage(ctx, business, check.date, check.time, now, "off-grid"),
+      };
     }
 
     // Claim the calendar slot. Checked AFTER idempotency so a retry of our own

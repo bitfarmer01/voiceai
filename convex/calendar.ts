@@ -113,20 +113,28 @@ export async function resetSampleCalendar(
   return seedCalendar(ctx, businessId, nowMs);
 }
 
-/** Plain-language rejection naming the two nearest open alternatives. */
+/**
+ * Plain-language rejection naming the two nearest open alternatives.
+ * `reason` picks the first sentence: a slot already on the calendar reads
+ * "is already taken"; a slot that isn't on the bookable grid at all (wrong
+ * granularity, or a day the degrade-path grid doesn't cover) reads "isn't a
+ * bookable slot" instead — same alternatives machinery either way.
+ */
 export async function takenMessage(
   ctx: Pick<QueryCtx, "db">,
   business: Doc<"businesses">,
   date: string,
   time: string,
   nowMs: number,
+  reason: "taken" | "off-grid" = "taken",
 ): Promise<string> {
   const schedule = parseHours(business.profile.hours);
   const taken = await loadTaken(ctx, business._id, date, CALENDAR_DAYS);
   const alts = nextOpenSlots({ grid: (d) => dayGrid(schedule, d), taken, fromDate: date, preferredTime: time, nowMs });
+  const reasonText = reason === "off-grid" ? "isn't a bookable slot" : "is already taken";
   return alts.length > 0
-    ? `Sorry — ${date} ${time} is already taken. The nearest open times are ${alts.join(" or ")}. Offer these two as a choice.`
-    : `Sorry — ${date} ${time} is already taken and nothing else is open in the next two weeks. Offer to take a message.`;
+    ? `Sorry — ${date} ${time} ${reasonText}. The nearest open times are ${alts.join(" or ")}. Offer these two as a choice.`
+    : `Sorry — ${date} ${time} ${reasonText} and nothing else is open in the next two weeks. Offer to take a message.`;
 }
 
 export const ensureSeeded = internalMutation({

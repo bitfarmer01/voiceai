@@ -177,6 +177,55 @@ test("bookAppointment rejects a slot another chat session already booked", async
   expect(b.message).toMatch(/already taken/);
   const rows = await t.run((ctx) => ctx.db.query("appointments").collect());
   expect(rows).toHaveLength(1);
+  const leads = await t.run((ctx) => ctx.db.query("leads").collect());
+  expect(leads).toHaveLength(1);
+});
+
+test("bookAppointment rejects an off-grid slot and persists nothing", async () => {
+  const t = convexTest(schema, modules);
+  const businessId = await seedConfigured(t);
+
+  // 2099-06-16 is a Monday; 09:15 is within Mon-Fri 9am-5pm but not on the
+  // 30-min grid (09:00, 09:30, ...).
+  const res = await t.mutation(api.chat.bookAppointment, {
+    businessId: businessId as any,
+    sessionId: "chat-offgrid",
+    slot: "2099-06-16T09:15",
+    customerName: "Pat",
+    contact: "pat@example.com",
+  });
+
+  expect(res.booked).toBe(false);
+  const leads = await t.run((ctx) => ctx.db.query("leads").collect());
+  expect(leads).toHaveLength(0);
+});
+
+test("bookAppointment keys idempotency on the parsed date+time, not the raw slot text", async () => {
+  const t = convexTest(schema, modules);
+  const businessId = await seedConfigured(t);
+
+  const first = await t.mutation(api.chat.bookAppointment, {
+    businessId: businessId as any,
+    sessionId: "chat-samefmt",
+    slot: "2099-06-16T10:00",
+    customerName: "Pat",
+    contact: "pat@example.com",
+  });
+  expect(first.booked).toBe(true);
+
+  // Same slot, re-sent in a different text format, in the same session.
+  const second = await t.mutation(api.chat.bookAppointment, {
+    businessId: businessId as any,
+    sessionId: "chat-samefmt",
+    slot: "2099-06-16 10:00",
+    customerName: "Pat",
+    contact: "pat@example.com",
+  });
+  expect(second.booked).toBe(true);
+  expect(second.confirmationId).toBe(first.confirmationId);
+
+  const rows = await t.run((ctx) => ctx.db.query("appointments").collect());
+  expect(rows.filter((r) => r.source === "booked")).toHaveLength(1);
 });
 
 test("lookupKnowledge wrapper returns the contract shape", async () => {
