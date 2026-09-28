@@ -8,7 +8,9 @@ import { ChatCircle, PaperPlaneTilt, X } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { AppointmentCard } from "@/components/shared/appointment-card";
 import { CalculatorResult } from "./calculator-result";
-import type { Booking } from "@/lib/types";
+import { buildOpener } from "@/lib/intake-script";
+import type { Booking, ServiceIntake } from "@/lib/types";
+import posthog from "posthog-js";
 
 // ChatMessage is UIMessage — importing UIMessage from ai directly avoids
 // a server/client boundary issue that would arise from importing the server route.
@@ -18,11 +20,20 @@ export function ReceptionistChat({
   businessName,
   knowledge,
   callerContext,
+  services,
+  hours,
+  intakeQuestions,
+  onCalendarChange,
 }: {
   businessId: string;
   businessName: string;
   knowledge: string;
   callerContext?: string;
+  services: string[];
+  hours: string;
+  intakeQuestions?: ServiceIntake[];
+  /** Lets the page's calendar ring offered slots and highlight the chat booking. */
+  onCalendarChange?: (s: { offeredSlots: string[]; bookedLeadId?: string }) => void;
 }) {
   const [open, setOpen] = React.useState(false);
   const [input, setInput] = React.useState("");
@@ -42,15 +53,67 @@ export function ReceptionistChat({
     transport: new DefaultChatTransport({ api: "/api/chat" }),
   });
 
+  // Derived from the thread: the latest offered slots and the booking (if any).
+  const latestOffered = React.useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const parts = messages[i].parts;
+      for (let j = parts.length - 1; j >= 0; j--) {
+        const p = parts[j];
+        if (p.type === "tool-checkAvailability" && p.state === "output-available") {
+          const out = p.output as { slots?: unknown };
+          return Array.isArray(out.slots) ? out.slots.filter((s): s is string => typeof s === "string") : [];
+        }
+      }
+    }
+    return [] as string[];
+  }, [messages]);
+
+  const bookedLeadId = React.useMemo(() => {
+    for (const m of messages) {
+      for (const p of m.parts) {
+        if (p.type === "tool-bookAppointment" && p.state === "output-available") {
+          const out = p.output as { booking?: { confirmationId?: string } | null };
+          if (out.booking?.confirmationId) return out.booking.confirmationId;
+        }
+      }
+    }
+    return undefined;
+  }, [messages]);
+
+  // Sync the derived chat state up to the page (the calendar lives outside this widget).
+  const offeredKey = latestOffered.join("|");
+  React.useEffect(() => {
+    onCalendarChange?.({ offeredSlots: offeredKey ? offeredKey.split("|") : [], bookedLeadId });
+  }, [offeredKey, bookedLeadId, onCalendarChange]);
+
   const send = () => {
     const text = input.trim();
     if (!text || !sessionId) return;
     sendMessage(
       { text },
-      { body: { businessId, businessName, knowledge, callerContext, sessionId } },
+      { body: { businessId, businessName, knowledge, callerContext, sessionId, services, hours, intakeQuestions } },
     );
     setInput("");
+    posthog.capture("chat_message_sent", { businessId });
   };
+
+  // Fire once when the receptionist confirms a booking in the chat thread.
+  const chatBookedRef = React.useRef(false);
+  React.useEffect(() => {
+    if (chatBookedRef.current) return;
+    const booked = messages.some((m) =>
+      m.parts.some(
+        (p) =>
+          p.type === "tool-bookAppointment" &&
+          p.state === "output-available" &&
+          (p.output as { booked?: boolean })?.booked,
+      ),
+    );
+    if (booked) {
+      chatBookedRef.current = true;
+      posthog.capture("appointment_booked", { channel: "chat", businessId });
+    }
+  }, [messages, businessId]);
 
   return (
     <>
@@ -58,7 +121,10 @@ export function ReceptionistChat({
         <button
           type="button"
           aria-label={`Chat with ${businessName}`}
-          onClick={() => setOpen(true)}
+          onClick={() => {
+            setOpen(true);
+            posthog.capture("chat_opened", { businessId });
+          }}
           className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] right-[calc(1rem+env(safe-area-inset-right))] z-50 inline-flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md transition-opacity duration-[150ms] ease-out hover:opacity-90 motion-reduce:transition-none"
         >
           <ChatCircle weight="fill" className="size-6" />
@@ -92,8 +158,8 @@ export function ReceptionistChat({
 
           <div className="flex-1 space-y-3 overflow-y-auto px-4 py-3 text-sm">
             {messages.length === 0 && (
-              <p className="text-pretty text-muted-foreground">
-                Ask about {businessName}&apos;s hours, services, or book an appointment.
+              <p className="inline-block max-w-[85%] text-pretty rounded-lg bg-muted/50 px-3 py-2 text-left">
+                {buildOpener(businessName, services, "chat")}
               </p>
             )}
             {messages.map((m) => (

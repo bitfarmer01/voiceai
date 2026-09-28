@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { CheckCircle, ArrowRight } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
@@ -19,6 +20,7 @@ export function Recap({
   onBuild,
   onCallAgain,
   onEdit,
+  calendar,
 }: {
   variant: "demo" | "your";
   businessName: string;
@@ -30,6 +32,8 @@ export function Recap({
   onCallAgain: () => void;
   /** your only — go back to the form to change the business. */
   onEdit?: () => void;
+  /** Live calendar highlighting the booking. */
+  calendar?: ReactNode;
 }) {
   const isDemo = variant === "demo";
   const title = isDemo ? "That's a receptionist in action" : "That's your receptionist";
@@ -49,6 +53,8 @@ export function Recap({
         <Row label="Messages exchanged" value={`${messageCount}`} />
         {booking && <Row label="Appointment" value="Booked" />}
       </dl>
+
+      {calendar && <div className="mt-6 w-full text-left">{calendar}</div>}
 
       {booking && (
         <div className="mt-3 w-full rounded-xl border bg-card px-5 py-4 text-left">

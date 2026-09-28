@@ -11,6 +11,7 @@ import { CallStage } from "@/components/try/stages/call-stage";
 import { PostCallReport } from "@/components/app/post-call-report";
 import { EmptyState } from "@/components/states/empty-state";
 import { ReceptionistChat } from "@/components/chat/receptionist-chat";
+import { AvailabilityCalendar } from "@/components/shared/availability-calendar";
 
 type Stage = "pre-call" | "in-call" | "post-call";
 
@@ -26,6 +27,7 @@ export function AppDemoClient({ slug }: { slug: string }) {
   const tc = useTryCall();
   const [stage, setStage] = React.useState<Stage>("pre-call");
   const [callerContext, setCallerContext] = React.useState("");
+  const [chatCal, setChatCal] = React.useState<{ offeredSlots: string[]; bookedLeadId?: string }>({ offeredSlots: [] });
 
   // Consent gate — ask once per session (same pattern as /try).
   const [consentOpen, setConsentOpen] = React.useState(false);
@@ -66,6 +68,14 @@ export function AppDemoClient({ slug }: { slug: string }) {
     requestStart(() => void tc.beginBusiness(biz, { callerContext: ctx }));
   };
 
+  const calendar = (
+    <AvailabilityCalendar
+      businessId={biz._id}
+      offeredSlots={[...tc.offeredSlots, ...chatCal.offeredSlots]}
+      highlightLeadId={tc.booking?.confirmationId ?? chatCal.bookedLeadId}
+    />
+  );
+
   return (
     <div className="mx-auto w-full max-w-[1100px]">
       {view === "pre-call" && (
@@ -97,6 +107,7 @@ export function AppDemoClient({ slug }: { slug: string }) {
           hoursText={biz.profile.hours}
           chunks={tc.chunks}
           usedChunkIds={tc.usedChunkIds}
+          calendar={calendar}
         />
       )}
 
@@ -112,6 +123,8 @@ export function AppDemoClient({ slug }: { slug: string }) {
           }}
         />
       )}
+
+      {view !== "in-call" && <div className="px-4 pb-10">{calendar}</div>}
 
       <ConsentDialog
         open={consentOpen}
@@ -136,6 +149,10 @@ export function AppDemoClient({ slug }: { slug: string }) {
           ...(biz.profile.availability ? [`Availability: ${biz.profile.availability}`] : []),
         ].join("\n")}
         callerContext={callerContext.trim() || undefined}
+        services={biz.profile.services}
+        hours={biz.profile.hours}
+        intakeQuestions={biz.profile.intakeQuestions}
+        onCalendarChange={setChatCal}
       />
     </div>
   );

@@ -54,6 +54,7 @@ export function CallStage({
   hoursText,
   chunks,
   usedChunkIds,
+  calendar,
 }: {
   variant: "demo" | "your";
   businessName: string;
@@ -72,6 +73,7 @@ export function CallStage({
   hoursText: string;
   chunks: KnowledgeChunk[] | undefined;
   usedChunkIds: string[];
+  calendar?: React.ReactNode;
 }) {
   const [showDetails, setShowDetails] = React.useState(false);
   const micDenied = !!call.error && /denied|permission|notallowed/i.test(call.error);
@@ -160,6 +162,8 @@ export function CallStage({
               )}
             </div>
           </div>
+
+          {calendar}
 
           {/* Quiet "show details" — spending + reassurances (+ pipeline in Technical mode). */}
           <div className="rounded-xl border bg-card">

@@ -18,6 +18,9 @@ import {
 } from "@/lib/vapi/assistant";
 import { useVapiCall, type VapiCall } from "@/lib/vapi/use-vapi-call";
 import type { FunctionReturnType } from "convex/server";
+import posthog from "posthog-js";
+
+type CallKind = "demo" | "business";
 
 const SITE_URL =
   process.env.NEXT_PUBLIC_CONVEX_SITE_URL ??
@@ -85,6 +88,10 @@ export interface TryCall {
   chunks: KnowledgeChunk[] | undefined;
   /** IDs of chunks the receptionist drew from this call so far. */
   usedChunkIds: string[];
+  /** Slots the receptionist just offered on this call ("YYYY-MM-DD HH:mm"). */
+  offeredSlots: string[];
+  /** The business the current/last call is against — drives the live calendar. */
+  currentBusinessId: Id<"businesses"> | null;
 }
 
 /**
@@ -100,6 +107,8 @@ export function useTryCall(): TryCall {
   const [trackedCallId, setTrackedCallId] = React.useState<string | null>(null);
   const [currentBusinessId, setCurrentBusinessId] = React.useState<Id<"businesses"> | null>(null);
   const activeCallIdRef = React.useRef<string | null>(null);
+  const callKindRef = React.useRef<CallKind | null>(null);
+  const bookedRef = React.useRef(false);
   const [sessionId] = React.useState(() => crypto.randomUUID());
 
   const call = useVapiCall();
@@ -125,6 +134,14 @@ export function useTryCall(): TryCall {
     return data?.usedChunks?.map((c) => c.chunkId) ?? [];
   }, [trackedCall?.structuredData]);
 
+  // Slots the receptionist just offered on this voice call (http.ts → patchOfferedSlots).
+  const offeredSlots: string[] = React.useMemo(() => {
+    const data = trackedCall?.structuredData as { offeredSlots?: unknown } | null | undefined;
+    return Array.isArray(data?.offeredSlots)
+      ? data.offeredSlots.filter((s): s is string => typeof s === "string")
+      : [];
+  }, [trackedCall?.structuredData]);
+
   const startCallM = useMutation(api.calls.startCall);
   const attachVapiIdM = useMutation(api.calls.attachVapiId);
   const endCallM = useMutation(api.lifecycle.endCall);
@@ -132,7 +149,7 @@ export function useTryCall(): TryCall {
   const blocked = !!guard && !guard.allowed;
 
   const begin = React.useCallback(
-    async (businessId: Id<"businesses">, assistant: unknown) => {
+    async (businessId: Id<"businesses">, assistant: unknown, kind: CallKind) => {
       try {
         const callId = await startCallM({
           sessionId,
@@ -143,7 +160,10 @@ export function useTryCall(): TryCall {
           llmProvider: pipeline.llmId,
         });
         activeCallIdRef.current = callId;
+        callKindRef.current = kind;
+        bookedRef.current = false;
         setTrackedCallId(callId);
+        posthog.capture("call_started", { kind });
         const vapiCallId = await call.start(assistant, callId, sessionId);
         if (vapiCallId) {
           await attachVapiIdM({ callId, vapiCallId });
@@ -177,7 +197,7 @@ export function useTryCall(): TryCall {
         businessId: business._id,
         today: todayLabel(),
       });
-      await begin(business._id, assistant);
+      await begin(business._id, assistant, "demo");
     },
     [visitorKey, businesses, pipeline, begin],
   );
@@ -194,7 +214,7 @@ export function useTryCall(): TryCall {
         today: todayLabel(),
         callerContext: opts?.callerContext,
       });
-      await begin(biz._id as Id<"businesses">, assistant);
+      await begin(biz._id as Id<"businesses">, assistant, "business");
     },
     [visitorKey, pipeline, begin],
   );
@@ -202,13 +222,23 @@ export function useTryCall(): TryCall {
   React.useEffect(() => {
     if (call.status === "ended" && activeCallIdRef.current) {
       setLastCallId(activeCallIdRef.current);
+      posthog.capture("call_ended", { kind: callKindRef.current });
     }
   }, [call.status]);
+
+  // Fire once per call when a booking first lands (Convex reactivity surfaces it).
+  React.useEffect(() => {
+    if (booking && !bookedRef.current) {
+      bookedRef.current = true;
+      posthog.capture("appointment_booked", { channel: "voice", kind: callKindRef.current });
+    }
+  }, [booking]);
 
   const resetCall = React.useCallback(() => {
     call.reset();
     setTrackedCallId(null);
     setStartError(null);
+    bookedRef.current = false;
   }, [call]);
 
   return {
@@ -229,6 +259,8 @@ export function useTryCall(): TryCall {
     resetCall,
     chunks,
     usedChunkIds,
+    offeredSlots,
+    currentBusinessId,
     trackedCall,
   };
 }
