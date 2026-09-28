@@ -16,12 +16,21 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+// Seeding fills the calendar with ~40% sample bookings; tests start from an empty one
+// and add exactly the rows they need.
+async function clearCalendar(t: ReturnType<typeof convexTest>): Promise<void> {
+  await t.run(async (ctx) => {
+    for (const r of await ctx.db.query("appointments").collect()) await ctx.db.delete(r._id);
+  });
+}
+
 // The first preset the seed produces is Glow Dental
 // (hours "Mon–Fri 8:00–17:00, Sat 9:00–13:00"). Validation below is keyed to it.
 async function seededBusinessId(
   t: ReturnType<typeof convexTest>,
 ): Promise<Id<"businesses">> {
   await t.mutation(internal.seed.seed, {});
+  await clearCalendar(t);
   const id = await t.run(async (ctx) => {
     // Collect all businesses and filter in JS — avoids the schema-typed
     // withIndex inside t.run's generic ctx.db (which only exposes system indexes).

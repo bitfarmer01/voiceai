@@ -5,6 +5,7 @@
 import { query, mutation, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
+import { resetSampleCalendar, seedCalendar } from "./calendar";
 
 export const listPresets = query({
   args: {},
@@ -181,6 +182,8 @@ export const upsertConfigured = mutation({
         tags: chunk.tags,
       });
     }
+    // A re-save may change the hours, so reset (rather than top up) the sample calendar.
+    await resetSampleCalendar(ctx, businessId, Date.now());
     return businessId;
   },
 });
@@ -225,6 +228,7 @@ export const insertUploadedBusiness = internalMutation({
         tags: chunk.tags,
       });
     }
+    await seedCalendar(ctx, businessId, Date.now());
     return businessId;
   },
 });

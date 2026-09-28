@@ -1,5 +1,5 @@
 /**
- * Wave A — Call lifecycle (plan.md §5.2).
+ * Wave A — Call lifecycle.
  *
  * The authoritative record of every call: start → live → ended. Budget and
  * concurrency accounting hang off this file:
@@ -23,6 +23,7 @@ import {
   recordCostOnce,
   releaseConcurrencyOnce,
 } from "./budget";
+import { seedCalendar } from "./calendar";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -229,6 +230,9 @@ export const startCall = mutation({
       languages: [],
       visitorKey: args.visitorKey,
     });
+
+    // Top the sample calendar up so the caller always sees 14 days ahead.
+    await seedCalendar(ctx, args.businessId, Date.now());
 
     // Bump live concurrency.
     await incActiveHelper(ctx);

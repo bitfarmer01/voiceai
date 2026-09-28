@@ -1,5 +1,6 @@
 import { mutation } from "./_generated/server";
 import { v } from "convex/values";
+import { seedCalendar } from "./calendar";
 
 const PRESET_DEFINITIONS = [
   {
@@ -97,6 +98,7 @@ export const ensurePresets = mutation({
         chunkCount: def.chunks.length,
         createdAt: Date.now(),
       });
+      await seedCalendar(ctx, businessId, Date.now());
       for (const chunk of def.chunks) {
         await ctx.db.insert("knowledgeChunks", {
           businessId,

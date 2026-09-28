@@ -19,6 +19,7 @@
 import { internalMutation } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { v } from "convex/values";
+import { seedCalendar } from "./calendar";
 
 // Fixed reference epoch so timestamps are stable across runs.
 // 2026-06-16T12:00:00.000Z (matches the project's "today" without reading the clock).
@@ -130,6 +131,7 @@ export const seed = internalMutation({
         createdAt: BASE_EPOCH,
       });
       businessIds[p.name] = businessId;
+      await seedCalendar(ctx, businessId, Date.now());
       for (const chunk of chunkSets[p.name]) {
         await ctx.db.insert("knowledgeChunks", {
           businessId,
