@@ -25,4 +25,10 @@ describe("buildChatSystemPrompt", () => {
     expect(buildChatSystemPrompt({ ...base, today: "2026-06-21" })).toContain("2026-06-21");
     expect(buildChatSystemPrompt(base)).not.toContain("Today is");
   });
+  it("embeds the booking flow and the opener the customer already saw", () => {
+    const p = buildChatSystemPrompt({ ...base, booking: { services: ["Cleaning"], hours: "Mon-Fri 9am-5pm" } });
+    expect(p).toContain("BOOKING FLOW");
+    expect(p).toContain("- Cleaning:");
+    expect(p).toContain("Are you booking cleaning today?");
+  });
 });

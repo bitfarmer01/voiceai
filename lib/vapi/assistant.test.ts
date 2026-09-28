@@ -43,8 +43,8 @@ describe("buildAssistant — preset", () => {
 
   it("includes the check-availability-before-book rule", () => {
     const s = systemContent(buildAssistant(preset, DEFAULT_PIPELINE));
-    expect(s).toMatch(/before booking, call check_availability/i);
-    expect(s).toMatch(/only the slots it returns/i);
+    expect(s).toMatch(/call check_availability/i);
+    expect(s).toMatch(/offer exactly the slots it returns/i);
   });
 
   it("instructs lookup_knowledge grounding for uncovered questions", () => {
@@ -89,7 +89,7 @@ describe("buildAssistantFromConvexBusiness — BYOD", () => {
         today: "Thursday, June 18, 2026",
       }),
     );
-    expect(s).toMatch(/before booking, call check_availability/i);
+    expect(s).toMatch(/call check_availability/i);
     expect(s).toMatch(/call lookup_knowledge first/i);
     expect(s).toMatch(/you only help with/i);
     expect(s).toContain(convexBiz.name);
@@ -120,5 +120,14 @@ describe("buildAssistantFromConvexBusiness — BYOD", () => {
       buildAssistantFromConvexBusiness(convexBiz, DEFAULT_PIPELINE, { callerContext: "   " }),
     );
     expect(blank).not.toMatch(/caller mentioned before starting/i);
+  });
+
+  it("opens with a closed service question and embeds the booking flow", () => {
+    const a = buildAssistantFromConvexBusiness(convexBiz, DEFAULT_PIPELINE);
+    expect(a.firstMessage).toMatch(/^Thanks for calling .+! Are you booking .+ today\?$/);
+    expect(a.firstMessage).not.toMatch(/how can i help/i);
+    const s = systemContent(a);
+    expect(s).toContain("BOOKING FLOW");
+    expect(s).toContain("check_availability");
   });
 });
