@@ -23,6 +23,7 @@ import {
   type BookAppointmentResult,
 } from "./_contracts";
 import { validateSlot } from "./lib/bookingSlot";
+import { isSlotTaken, insertBookedAppointment, takenMessage } from "./calendar";
 
 export const lookupKnowledge = query({
   args: lookupKnowledgeArgs,
@@ -109,6 +110,15 @@ export const bookAppointment = mutation({
       return { booked: true, confirmationId: prior._id, slot: args.slot, icsUrl: `/api/ics/${prior._id}`, message: "Appointment already booked (idempotent retry)." };
     }
 
+    if (await isSlotTaken(ctx, args.businessId, v2.date, v2.time)) {
+      return {
+        booked: false,
+        confirmationId: "",
+        slot: args.slot,
+        message: await takenMessage(ctx, business, v2.date, v2.time, now),
+      };
+    }
+
     const requestSummary = [
       `Booking ${args.service ?? "appointment"} for ${args.customerName} at ${args.slot}`,
       args.notes ? `Notes: ${args.notes}` : null,
@@ -121,6 +131,15 @@ export const bookAppointment = mutation({
       contact: args.contact,
       request: requestSummary,
       createdAt: now,
+    });
+
+    await insertBookedAppointment(ctx, {
+      businessId: args.businessId,
+      date: v2.date,
+      time: v2.time,
+      leadId,
+      service: args.service,
+      customerName: args.customerName,
     });
 
     await ctx.db.patch(anchor._id, {

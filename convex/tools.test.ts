@@ -321,25 +321,79 @@ describe("book_appointment — validation against real hours", () => {
     expect(leads).toHaveLength(0);
   });
 
-  // ── Probe fix #2: a same-day, date-only booking must NOT be rejected as past ──
-  test("allows a same-day date-only slot (time settled on the call)", async () => {
-    vi.useFakeTimers();
-    // Monday afternoon — Glow is open; the date-only slot is "today".
-    vi.setSystemTime(new Date("2026-06-22T15:00:00.000Z"));
-    try {
-      const t = convexTest(schema, modules);
-      const businessId = await seededBusinessId(t);
-      await liveCallFor(t, businessId);
+  test("rejects a date-only slot and persists nothing", async () => {
+    const t = convexTest(schema, modules);
+    const businessId = await seededBusinessId(t);
+    await liveCallFor(t, businessId);
+    const res = await t.mutation(internal.tools.bookAppointment, {
+      businessId,
+      slot: "2026-06-22",
+      customerName: "Sam Lee",
+      contact: "sam@example.com",
+    });
+    expect(res.booked).toBe(false);
+    const leads = await t.run((ctx) => ctx.db.query("leads").collect());
+    expect(leads).toHaveLength(0);
+  });
 
-      const res = await t.mutation(internal.tools.bookAppointment, {
-        businessId,
-        slot: "2026-06-22", // today, no time
-        customerName: "Test Caller",
-        contact: "test@example.com",
-      });
-      expect(res.booked).toBe(true);
-    } finally {
-      vi.useRealTimers();
-    }
+  test("writes a booked appointment row on success", async () => {
+    const t = convexTest(schema, modules);
+    const businessId = await seededBusinessId(t);
+    await liveCallFor(t, businessId);
+    const res = await t.mutation(internal.tools.bookAppointment, {
+      businessId,
+      slot: "2026-06-22 09:00",
+      customerName: "Sam Lee",
+      contact: "sam@example.com",
+      service: "Cleaning",
+    });
+    expect(res.booked).toBe(true);
+    const rows = await t.run((ctx) => ctx.db.query("appointments").collect());
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      date: "2026-06-22",
+      time: "09:00",
+      source: "booked",
+      leadId: res.confirmationId,
+      service: "Cleaning",
+      customerFirstName: "Sam",
+    });
+  });
+
+  test("rejects a slot the calendar already holds, suggests two alternatives, persists nothing", async () => {
+    const t = convexTest(schema, modules);
+    const businessId = await seededBusinessId(t);
+    await liveCallFor(t, businessId);
+    await takeSlot(t, businessId, "2026-06-22", "09:00");
+    const res = await t.mutation(internal.tools.bookAppointment, {
+      businessId,
+      slot: "2026-06-22 09:00",
+      customerName: "Sam Lee",
+      contact: "sam@example.com",
+    });
+    expect(res.booked).toBe(false);
+    expect(res.message).toContain("2026-06-22 09:30 or 2026-06-22 10:00");
+    const leads = await t.run((ctx) => ctx.db.query("leads").collect());
+    expect(leads).toHaveLength(0);
+  });
+
+  test("idempotent retry does not self-conflict", async () => {
+    const t = convexTest(schema, modules);
+    const businessId = await seededBusinessId(t);
+    await liveCallFor(t, businessId);
+    const args = {
+      businessId,
+      slot: "2026-06-22 09:00",
+      customerName: "Sam Lee",
+      contact: "sam@example.com",
+      idempotencyKey: "retry-1",
+    };
+    const first = await t.mutation(internal.tools.bookAppointment, args);
+    const second = await t.mutation(internal.tools.bookAppointment, args);
+    expect(first.booked).toBe(true);
+    expect(second.booked).toBe(true);
+    expect(second.confirmationId).toBe(first.confirmationId);
+    const rows = await t.run((ctx) => ctx.db.query("appointments").collect());
+    expect(rows.filter((r) => r.source === "booked")).toHaveLength(1);
   });
 });

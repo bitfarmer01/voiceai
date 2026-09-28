@@ -71,6 +71,19 @@ describe("validateSlot", () => {
     }
   });
 
+  it("returns the parsed date and time on success", () => {
+    expect(validateSlot(MON_HOURS, `${MONDAY}T10:00`, FIXED_NOW)).toMatchObject({ ok: true, date: MONDAY, time: "10:00" });
+  });
+
+  it("rejects a date-only slot — a concrete offered time is required", () => {
+    const r = validateSlot(MON_HOURS, MONDAY, FIXED_NOW);
+    expect(r.ok).toBe(false);
+  });
+
+  it("rejects an unreadable slot", () => {
+    expect(validateSlot(MON_HOURS, "next tuesday-ish", FIXED_NOW).ok).toBe(false);
+  });
+
   it("returns ok:false for a past slot", () => {
     const result = validateSlot(MON_HOURS, "2020-06-15T10:00", FIXED_NOW);
     expect(result.ok).toBe(false);

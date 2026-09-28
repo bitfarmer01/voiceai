@@ -161,6 +161,24 @@ test("bookAppointment rejects a closed-day slot", async () => {
   expect(res.message).toMatch(/closed|Saturday|Mon-Fri/i);
 });
 
+test("bookAppointment rejects a slot another chat session already booked", async () => {
+  const t = convexTest(schema, modules);
+  const businessId = await seedConfigured(t);
+  const base = {
+    businessId: businessId as any,
+    slot: "2099-06-16T10:00",
+    customerName: "Pat",
+    contact: "pat@example.com",
+  };
+  const a = await t.mutation(api.chat.bookAppointment, { ...base, sessionId: "chat-a" });
+  const b = await t.mutation(api.chat.bookAppointment, { ...base, sessionId: "chat-b", customerName: "Kim" });
+  expect(a.booked).toBe(true);
+  expect(b.booked).toBe(false);
+  expect(b.message).toMatch(/already taken/);
+  const rows = await t.run((ctx) => ctx.db.query("appointments").collect());
+  expect(rows).toHaveLength(1);
+});
+
 test("lookupKnowledge wrapper returns the contract shape", async () => {
   const t = convexTest(schema, modules);
   const businessId = await seedConfigured(t);
