@@ -702,3 +702,32 @@ describe("sanitizeProfile", () => {
     expect(result.chunks[0].tags).toEqual(["tag1"]); // tags are not sanitized
   });
 });
+
+describe("intake questions in the profile pipeline", () => {
+  const base = { companyName: "Cut Co", hours: "Mon–Fri 9–5", services: ["Cut"], policies: [], availability: "", chunks: [] };
+
+  it("sanitizeProfile keeps valid sets for known services and drops the rest", () => {
+    const out = sanitizeProfile({
+      ...base,
+      intakeQuestions: [
+        { service: "cut", questions: [{ prompt: "New or returning?", options: ["New", "Returning"] }] },
+        { service: "Color", questions: [{ prompt: "Shade?", options: ["Light", "Dark"] }] },
+      ],
+    });
+    expect(out.intakeQuestions).toEqual([
+      { service: "Cut", questions: [{ id: "cut-1", prompt: "New or returning?", options: ["New", "Returning"] }] },
+    ]);
+  });
+
+  it("sanitizeProfile returns [] when the model omits intakeQuestions", () => {
+    expect(sanitizeProfile(base).intakeQuestions).toEqual([]);
+  });
+
+  it("the extraction schema accepts a profile with and without intakeQuestions", () => {
+    const schema = businessProfileSchema(z);
+    expect(schema.safeParse(base).success).toBe(true);
+    expect(
+      schema.safeParse({ ...base, intakeQuestions: [{ service: "Cut", questions: [{ prompt: "?", options: ["a", "b"] }] }] }).success,
+    ).toBe(true);
+  });
+});

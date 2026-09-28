@@ -1,4 +1,5 @@
 import type { PresetBusiness } from "@/lib/data/presets";
+import type { ServiceIntake } from "@/lib/types";
 // Relative (not "@/convex/_contracts") so this value import resolves under Vitest,
 // which has no "@/" alias configured; _contracts is side-effect-free + client-safe.
 import { BUDGET } from "../../convex/_contracts";
@@ -224,6 +225,7 @@ export interface ConvexBusinessForAssistant {
     services: string[];
     policies: string[];
     availability: string;
+    intakeQuestions?: ServiceIntake[];
   };
   chunks: { text: string }[];
 }

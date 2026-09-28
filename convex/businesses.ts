@@ -6,6 +6,8 @@ import { query, mutation, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import { resetSampleCalendar, seedCalendar } from "./calendar";
+import { intakeQuestionsValidator } from "./_contracts";
+import { validateIntake } from "./lib/intake";
 
 export const listPresets = query({
   args: {},
@@ -46,6 +48,7 @@ export const getWithChunks = query({
         services: v.array(v.string()),
         policies: v.array(v.string()),
         availability: v.string(),
+        intakeQuestions: v.optional(intakeQuestionsValidator),
       }),
       chunks: v.array(v.object({ text: v.string(), tags: v.array(v.string()) })),
     }),
@@ -66,6 +69,7 @@ export const getWithChunks = query({
         services: biz.profile.services,
         policies: biz.profile.policies,
         availability: biz.profile.availability,
+        ...(biz.profile.intakeQuestions ? { intakeQuestions: biz.profile.intakeQuestions } : {}),
       },
       chunks: chunks.map((c) => ({ text: c.text, tags: c.tags })),
     };
@@ -90,6 +94,7 @@ export const getBySlug = query({
         services: v.array(v.string()),
         policies: v.array(v.string()),
         availability: v.string(),
+        intakeQuestions: v.optional(intakeQuestionsValidator),
       }),
       chunks: v.array(v.object({ text: v.string(), tags: v.array(v.string()) })),
     }),
@@ -114,6 +119,7 @@ export const getBySlug = query({
         services: biz.profile.services,
         policies: biz.profile.policies,
         availability: biz.profile.availability,
+        ...(biz.profile.intakeQuestions ? { intakeQuestions: biz.profile.intakeQuestions } : {}),
       },
       chunks: chunks.map((c) => ({ text: c.text, tags: c.tags })),
     };
@@ -138,11 +144,22 @@ export const upsertConfigured = mutation({
       services: v.array(v.string()),
       policies: v.array(v.string()),
       availability: v.string(),
+      intakeQuestions: v.optional(intakeQuestionsValidator),
     }),
     chunks: v.array(v.object({ text: v.string(), tags: v.array(v.string()) })),
   },
   returns: v.id("businesses"),
   handler: async (ctx, args) => {
+    const intake = validateIntake(args.profile.intakeQuestions, args.profile.services);
+    const baseProfile = {
+      companyName: args.profile.companyName,
+      hours: args.profile.hours,
+      services: args.profile.services,
+      policies: args.profile.policies,
+      availability: args.profile.availability,
+    };
+    const profile = intake.length > 0 ? { ...baseProfile, intakeQuestions: intake } : baseProfile;
+
     const slug = args.slug.trim().toLowerCase();
     const existing = await ctx.db
       .query("businesses")
@@ -160,7 +177,7 @@ export const upsertConfigured = mutation({
       await ctx.db.patch(existing._id, {
         kind: "configured",
         name: args.name,
-        profile: args.profile,
+        profile: profile,
         chunkCount: args.chunks.length,
       });
       businessId = existing._id;
@@ -169,7 +186,7 @@ export const upsertConfigured = mutation({
         kind: "configured",
         slug,
         name: args.name,
-        profile: args.profile,
+        profile,
         chunkCount: args.chunks.length,
         createdAt: Date.now(),
       });
@@ -200,6 +217,7 @@ export const insertUploadedBusiness = internalMutation({
     policies: v.array(v.string()),
     availability: v.string(),
     chunks: v.array(v.object({ text: v.string(), tags: v.array(v.string()) })),
+    intakeQuestions: v.optional(intakeQuestionsValidator),
   },
   returns: v.id("businesses"),
   handler: async (ctx, args) => {
@@ -213,6 +231,7 @@ export const insertUploadedBusiness = internalMutation({
         services: args.services,
         policies: args.policies,
         availability: args.availability,
+        ...(args.intakeQuestions && args.intakeQuestions.length > 0 ? { intakeQuestions: args.intakeQuestions } : {}),
       },
       sourceMeta: args.storageId
         ? { storageId: args.storageId, fileName: args.fileName!, mimeType: args.mimeType! }

@@ -16,6 +16,28 @@ export const PRESETS: PresetBusiness[] = [
     hours: "Mon–Fri 8am–5pm, Sat 9am–1pm, closed Sunday",
     services: ["Routine cleaning", "Whitening", "Fillings", "Crowns", "Emergency visits"],
     policies: ["New patients welcome", "24h cancellation notice", "Most PPO insurance accepted"],
+    intakeQuestions: [
+      { service: "Routine cleaning", questions: [
+        { id: "routine-cleaning-1", prompt: "Is this your first visit with us?", options: ["First visit", "Returning"] },
+        { id: "routine-cleaning-2", prompt: "Would you like us to bill dental insurance?", options: ["Yes", "No"] },
+      ] },
+      { service: "Whitening", questions: [
+        { id: "whitening-1", prompt: "Have you had professional whitening before?", options: ["Yes", "No"] },
+        { id: "whitening-2", prompt: "In-office or a take-home kit?", options: ["In-office", "Take-home kit"] },
+      ] },
+      { service: "Fillings", questions: [
+        { id: "fillings-1", prompt: "Is the tooth painful right now?", options: ["Yes", "No"] },
+        { id: "fillings-2", prompt: "Is this your first visit with us?", options: ["First visit", "Returning"] },
+      ] },
+      { service: "Crowns", questions: [
+        { id: "crowns-1", prompt: "Is this a new crown or a replacement?", options: ["New crown", "Replacement"] },
+        { id: "crowns-2", prompt: "Is the tooth painful right now?", options: ["Yes", "No"] },
+      ] },
+      { service: "Emergency visits", questions: [
+        { id: "emergency-visits-1", prompt: "Which best describes it?", options: ["Severe pain", "Broken or chipped tooth", "Swelling", "Lost filling or crown"] },
+        { id: "emergency-visits-2", prompt: "Is this your first visit with us?", options: ["First visit", "Returning"] },
+      ] },
+    ],
     chunkCount: 12,
     serviceDetails: [
       { name: "Routine cleaning", price: "$120" },
