@@ -63,6 +63,32 @@ const PRESET_DEFINITIONS = [
       { text: "All communications with the firm are confidential.", tags: ["policy", "confidential"] },
     ],
   },
+  {
+    name: "Affordable Health Insurance of Central Florida",
+    profile: {
+      companyName: "Affordable Health Insurance of Central Florida",
+      hours: "Mon–Fri 9:00–17:00",
+      services: ["Medicare", "Health insurance", "Life insurance", "Small business plans"],
+      policies: [
+        "Consultations are free — paid by carriers",
+        "No plan advice or premium quotes by phone",
+        "Serving Orlando and Central Florida",
+      ],
+      availability: "Next available: weekdays",
+    },
+    chunks: [
+      { text: "We're open Monday to Friday, 9am to 5pm.", tags: ["hours"] },
+      { text: "Consultations are always free — Samuel is paid by the insurance carriers, never by you.", tags: ["policy", "pricing"] },
+      { text: "We help with Medicare, ACA Marketplace health plans, life insurance, and small business coverage.", tags: ["services"] },
+      { text: "Medicare Annual Enrollment runs October 15 to December 7; ACA Open Enrollment runs November 1 to January 15.", tags: ["policy", "enrollment"] },
+      { text: "For every service, the next step is a free consultation with Samuel, where he reviews your options, costs, and coverage.", tags: ["services", "consultation"] },
+      { text: "You don't need to know which plan or type of policy you want before booking — Samuel explains the options at the consultation.", tags: ["services", "consultation"] },
+      { text: "Samuel Gordon is a licensed Florida insurance agent with over 14 years of experience, and compares plans from many Florida carriers.", tags: ["about", "agent"] },
+      { text: "Most clients are quoted the same day.", tags: ["pricing", "quotes"] },
+      { text: "We serve Orlando, Kissimmee, Sanford, Deltona, The Villages, Winter Park, Daytona Beach, Ocala, Lakeland, and Altamonte Springs.", tags: ["location", "service-area"] },
+      { text: "The receptionist can't give plan advice, quote premiums, or confirm whether a doctor or prescription is covered — Samuel reviews all of that at the free consultation.", tags: ["policy", "pricing"] },
+    ],
+  },
 ] as const;
 
 export const ensurePresets = mutation({
@@ -83,10 +109,31 @@ export const ensurePresets = mutation({
       .query("businesses")
       .withIndex("by_kind", (q) => q.eq("kind", "preset"))
       .collect();
-    const existingNames = new Set(existing.map((b) => b.name));
+    const existingByName = new Map(existing.map((b) => [b.name, b]));
 
     for (const def of PRESET_DEFINITIONS) {
-      if (existingNames.has(def.name)) continue;
+      const found = existingByName.get(def.name);
+      if (found) {
+        // Top up chunks added to the definition after this preset was seeded;
+        // never duplicates or removes existing ones.
+        const stored = await ctx.db
+          .query("knowledgeChunks")
+          .withIndex("by_business", (q) => q.eq("businessId", found._id))
+          .collect();
+        const have = new Set(stored.map((c) => c.text));
+        const missing = def.chunks.filter((c) => !have.has(c.text));
+        for (const chunk of missing) {
+          await ctx.db.insert("knowledgeChunks", {
+            businessId: found._id,
+            text: chunk.text,
+            tags: [...chunk.tags],
+          });
+        }
+        if (missing.length > 0) {
+          await ctx.db.patch(found._id, { chunkCount: stored.length + missing.length });
+        }
+        continue;
+      }
       const businessId = await ctx.db.insert("businesses", {
         kind: "preset",
         name: def.name,

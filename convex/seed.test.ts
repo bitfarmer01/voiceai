@@ -24,8 +24,8 @@ describe("seed conforms to the frozen schema and writes NO fabricated data", () 
     );
 
     // Preset product content IS seeded (real businesses a visitor talks to).
-    expect(businesses).toHaveLength(3);
-    expect(chunks).toHaveLength(12); // 4 chunks × 3 presets
+    expect(businesses).toHaveLength(4);
+    expect(chunks).toHaveLength(22); // 4 chunks × 3 presets + 10 for the insurance preset
     for (const b of businesses) {
       expect(b.kind).toBe("preset");
     }
@@ -56,7 +56,7 @@ describe("seed conforms to the frozen schema and writes NO fabricated data", () 
     );
 
     // clear-then-insert, not append.
-    expect(businesses).toHaveLength(3);
+    expect(businesses).toHaveLength(4);
     expect(calls).toHaveLength(0);
     expect(providerStats).toHaveLength(0);
     expect(budget).toHaveLength(1);
