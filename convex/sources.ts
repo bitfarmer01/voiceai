@@ -5,6 +5,7 @@ import type { ActionCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
+import { intakeQuestionsValidator, type ServiceIntake } from "./_contracts";
 import {
   sanitizeProfile,
   businessProfileSchema,
@@ -17,9 +18,8 @@ import {
   htmlToText,
   assertSafeUrl,
 } from "./lib/ingest_helpers";
+import { NIM_BASE_URL, NIM_TEXT_MODEL, nimFetch } from "./lib/nim";
 
-const NIM_BASE_URL = "https://integrate.api.nvidia.com/v1";
-const NIM_MODEL = "nvidia/nemotron-3-nano-30b-a3b";
 const MAX_TEXT_CHARS = 50_000;
 
 /**
@@ -43,10 +43,11 @@ export async function extractAndInsert(
   const nim = createOpenAI({
     baseURL: NIM_BASE_URL,
     apiKey: process.env.NVIDIA_NIM_API_KEY ?? "",
+    fetch: nimFetch,
   });
 
   const { object } = await generateObject({
-    model: nim(NIM_MODEL),
+    model: nim.chat(NIM_TEXT_MODEL),
     schema: businessProfileSchema(z),
     prompt,
   });
@@ -164,6 +165,7 @@ type DraftProfile = {
   policies: string[];
   availability: string;
   chunks: Array<{ text: string; tags: string[] }>;
+  intakeQuestions: ServiceIntake[];
 };
 
 const draftProfileValidator = v.object({
@@ -173,6 +175,7 @@ const draftProfileValidator = v.object({
   policies: v.array(v.string()),
   availability: v.string(),
   chunks: v.array(v.object({ text: v.string(), tags: v.array(v.string()) })),
+  intakeQuestions: intakeQuestionsValidator,
 });
 
 /**
@@ -201,10 +204,11 @@ export const generateDraftProfile = action({
     const nim = createOpenAI({
       baseURL: NIM_BASE_URL,
       apiKey: process.env.NVIDIA_NIM_API_KEY ?? "",
+      fetch: nimFetch,
     });
 
     const { object } = await generateObject({
-      model: nim(NIM_MODEL),
+      model: nim.chat(NIM_TEXT_MODEL),
       schema: businessProfileSchema(z),
       prompt: buildFormDraftPrompt(clamped),
     });
@@ -227,6 +231,7 @@ export const createBusinessFromProfile = action({
     policies: v.array(v.string()),
     availability: v.string(),
     chunks: v.array(v.object({ text: v.string(), tags: v.array(v.string()) })),
+    intakeQuestions: v.optional(intakeQuestionsValidator),
   },
   returns: v.object({ businessId: v.id("businesses") }),
   handler: async (ctx, args): Promise<{ businessId: Id<"businesses"> }> => {
@@ -237,6 +242,7 @@ export const createBusinessFromProfile = action({
       policies: args.policies,
       availability: args.availability,
       chunks: args.chunks,
+      intakeQuestions: args.intakeQuestions,
     });
 
     const businessId = await ctx.runMutation(internal.businesses.insertUploadedBusiness, {
@@ -277,11 +283,12 @@ export const suggestField = action({
       const nim = createOpenAI({
         baseURL: NIM_BASE_URL,
         apiKey: process.env.NVIDIA_NIM_API_KEY ?? "",
+        fetch: nimFetch,
       });
 
       if (args.field === "businessType") {
         const { object } = await generateObject({
-          model: nim(NIM_MODEL),
+          model: nim.chat(NIM_TEXT_MODEL),
           schema: z.object({ suggestion: z.string().max(80) }),
           prompt: buildSuggestPrompt({
             field: "businessType",
@@ -293,7 +300,7 @@ export const suggestField = action({
       }
 
       const { object } = await generateObject({
-        model: nim(NIM_MODEL),
+        model: nim.chat(NIM_TEXT_MODEL),
         schema: z.object({ suggestions: z.array(z.string().max(80)).max(6) }),
         prompt: buildSuggestPrompt({
           field: "services",

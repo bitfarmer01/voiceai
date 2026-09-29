@@ -1,5 +1,5 @@
 /**
- * Frozen domain vocabulary + UI-facing types (ui-development-plan.md §2, plan.md §10).
+ * Frozen domain vocabulary + UI-facing types.
  * These are the integration seam the UI builds against. The Convex schema mirrors them;
  * `lib/data/*` hooks return these shapes (mock now, `useQuery(api...)` later) so screens
  * never change when the backend goes live.
@@ -131,6 +131,19 @@ export interface Booking {
 }
 
 // ── Business profile (grounding) ────────────────────────────────────────────────
+/** Mirrors convex/_contracts.ts IntakeQuestion. */
+export interface IntakeQuestion {
+  id: string;
+  prompt: string;
+  options: string[];
+}
+
+/** Mirrors convex/_contracts.ts ServiceIntake. */
+export interface ServiceIntake {
+  service: string;
+  questions: IntakeQuestion[];
+}
+
 export interface BusinessProfile {
   id: string;
   name: string;
@@ -139,6 +152,8 @@ export interface BusinessProfile {
   services: string[];
   policies: string[];
   chunkCount: number;
+  /** Per-service closed-choice intake questions; absent = generic set. */
+  intakeQuestions?: ServiceIntake[];
 }
 
 // ── Reference panel ──────────────────────────────────────────────────────────

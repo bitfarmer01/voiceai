@@ -1,5 +1,5 @@
 /**
- * Wave A — Call lifecycle (plan.md §5.2).
+ * Wave A — Call lifecycle.
  *
  * The authoritative record of every call: start → live → ended. Budget and
  * concurrency accounting hang off this file:
@@ -23,6 +23,7 @@ import {
   recordCostOnce,
   releaseConcurrencyOnce,
 } from "./budget";
+import { seedCalendar } from "./calendar";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -230,6 +231,9 @@ export const startCall = mutation({
       visitorKey: args.visitorKey,
     });
 
+    // Top the sample calendar up so the caller always sees 14 days ahead.
+    await seedCalendar(ctx, args.businessId, Date.now());
+
     // Bump live concurrency.
     await incActiveHelper(ctx);
 
@@ -423,7 +427,7 @@ export const listRecentAnonymized = query({
       .withIndex("by_startedAt")
       .order("desc")
       .take(limit * 3);
-    const ended = rows.filter((c) => c.status === "ended").slice(0, limit);
+    const ended = rows.filter((c) => c.status === "ended" && c.channel !== "chat").slice(0, limit);
     return ended.map((c) => ({
       id: c._id,
       businessName: c.businessName,
@@ -556,6 +560,33 @@ export const patchUsedChunks = internalMutation({
     await ctx.db.patch(liveCall._id, {
       structuredData: { ...existingData, usedChunks: [...existing, ...fresh] },
     });
+    return null;
+  },
+});
+
+// ── patchOfferedSlots (internal; called from http.ts checkAvailabilityTool) ──
+// Records the two slots the receptionist just offered on the LIVE voice call so
+// the calendar can ring them in real time. Only a live voice call — never the
+// most-recent fallback or a chat anchor.
+export const patchOfferedSlots = internalMutation({
+  args: { businessId: v.id("businesses"), slots: v.array(v.string()) },
+  returns: v.null(),
+  handler: async (ctx, { businessId, slots }) => {
+    const businessCalls = await ctx.db
+      .query("calls")
+      .withIndex("by_business", (q) => q.eq("businessId", businessId))
+      .collect();
+    const liveCall =
+      [...businessCalls]
+        .sort((a, b) => b.startedAt - a.startedAt)
+        .find((c) => c.status === "live" && c.channel !== "chat") ?? null;
+    if (!liveCall) return null;
+
+    const existing =
+      typeof liveCall.structuredData === "object" && liveCall.structuredData !== null
+        ? (liveCall.structuredData as Record<string, unknown>)
+        : {};
+    await ctx.db.patch(liveCall._id, { structuredData: { ...existing, offeredSlots: slots } });
     return null;
   },
 });

@@ -19,6 +19,7 @@
 import { internalMutation } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { v } from "convex/values";
+import { seedCalendar } from "./calendar";
 
 // Fixed reference epoch so timestamps are stable across runs.
 // 2026-06-16T12:00:00.000Z (matches the project's "today" without reading the clock).
@@ -94,6 +95,20 @@ export const seed = internalMutation({
           availability: "Next available: by appointment",
         },
       },
+      {
+        name: "Affordable Health Insurance of Central Florida",
+        profile: {
+          companyName: "Affordable Health Insurance of Central Florida",
+          hours: "Mon–Fri 9:00–17:00",
+          services: ["Medicare", "Health insurance", "Life insurance", "Small business plans"],
+          policies: [
+            "Consultations are free — paid by carriers",
+            "No plan advice or premium quotes by phone",
+            "Serving Orlando and Central Florida",
+          ],
+          availability: "Next available: weekdays",
+        },
+      },
     ];
 
     const businessIds: Record<string, Id<"businesses">> = {};
@@ -118,6 +133,18 @@ export const seed = internalMutation({
         { text: "We handle estate planning, business formation, and contracts.", tags: ["services"] },
         { text: "All communications with the firm are confidential.", tags: ["policy", "confidential"] },
       ],
+      "Affordable Health Insurance of Central Florida": [
+        { text: "We're open Monday to Friday, 9am to 5pm.", tags: ["hours"] },
+        { text: "Consultations are always free — Samuel is paid by the insurance carriers, never by you.", tags: ["policy", "pricing"] },
+        { text: "We help with Medicare, ACA Marketplace health plans, life insurance, and small business coverage.", tags: ["services"] },
+        { text: "Medicare Annual Enrollment runs October 15 to December 7; ACA Open Enrollment runs November 1 to January 15.", tags: ["policy", "enrollment"] },
+        { text: "For every service, the next step is a free consultation with Samuel, where he reviews your options, costs, and coverage.", tags: ["services", "consultation"] },
+        { text: "You don't need to know which plan or type of policy you want before booking — Samuel explains the options at the consultation.", tags: ["services", "consultation"] },
+        { text: "Samuel Gordon is a licensed Florida insurance agent with over 14 years of experience, and compares plans from many Florida carriers.", tags: ["about", "agent"] },
+        { text: "Most clients are quoted the same day.", tags: ["pricing", "quotes"] },
+        { text: "We serve Orlando, Kissimmee, Sanford, Deltona, The Villages, Winter Park, Daytona Beach, Ocala, Lakeland, and Altamonte Springs.", tags: ["location", "service-area"] },
+        { text: "The receptionist can't give plan advice, quote premiums, or confirm whether a doctor or prescription is covered — Samuel reviews all of that at the free consultation.", tags: ["policy", "pricing"] },
+      ],
     };
 
     for (let i = 0; i < presets.length; i++) {
@@ -130,6 +157,7 @@ export const seed = internalMutation({
         createdAt: BASE_EPOCH,
       });
       businessIds[p.name] = businessId;
+      await seedCalendar(ctx, businessId, Date.now());
       for (const chunk of chunkSets[p.name]) {
         await ctx.db.insert("knowledgeChunks", {
           businessId,

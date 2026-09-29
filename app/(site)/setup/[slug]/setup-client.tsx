@@ -1,11 +1,13 @@
 "use client";
 
 import * as React from "react";
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { Check, Copy } from "@phosphor-icons/react";
 import { api } from "@/convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { GuidedForm } from "@/components/try/stages/guided-form";
+import { AvailabilityCalendar } from "@/components/shared/availability-calendar";
+import type { ServiceIntake } from "@/lib/types";
 
 /**
  * SetupClient — the operator's configuration surface for /setup/[slug]. Reuses the
@@ -16,8 +18,9 @@ import { GuidedForm } from "@/components/try/stages/guided-form";
  */
 export function SetupClient({ slug }: { slug: string }) {
   const [sessionId] = React.useState(() => crypto.randomUUID());
-  const [saved, setSaved] = React.useState(false);
+  const [savedId, setSavedId] = React.useState<string | null>(null);
   const upsert = useMutation(api.businesses.upsertConfigured);
+  const existing = useQuery(api.businesses.getBySlug, { slug });
 
   const handleSave = React.useCallback(
     async (profile: {
@@ -27,8 +30,9 @@ export function SetupClient({ slug }: { slug: string }) {
       policies: string[];
       availability: string;
       chunks: { text: string; tags: string[] }[];
+      intakeQuestions?: ServiceIntake[];
     }) => {
-      await upsert({
+      const id = await upsert({
         slug,
         name: profile.companyName,
         profile: {
@@ -37,18 +41,24 @@ export function SetupClient({ slug }: { slug: string }) {
           services: profile.services,
           policies: profile.policies,
           availability: profile.availability,
+          intakeQuestions: profile.intakeQuestions,
         },
         chunks: profile.chunks,
       });
-      setSaved(true);
+      setSavedId(id);
     },
     [slug, upsert],
   );
 
-  if (saved) return <SavedConfirmation slug={slug} />;
+  if (savedId) return <SavedConfirmation slug={slug} businessId={savedId} />;
 
   return (
     <div className="mx-auto w-full max-w-[1100px]">
+      {existing && (
+        <div className="px-4 pt-8">
+          <AvailabilityCalendar businessId={existing._id} ownerView title="Your calendar" />
+        </div>
+      )}
       <GuidedForm
         sessionId={sessionId}
         onSaveConfig={handleSave}
@@ -60,7 +70,7 @@ export function SetupClient({ slug }: { slug: string }) {
   );
 }
 
-function SavedConfirmation({ slug }: { slug: string }) {
+function SavedConfirmation({ slug, businessId }: { slug: string; businessId: string }) {
   const [copied, setCopied] = React.useState(false);
   const canonical = slug.trim().toLowerCase();
   const path = `/app/${canonical}`;
@@ -98,6 +108,8 @@ function SavedConfirmation({ slug }: { slug: string }) {
       <Button asChild variant="ghost" className="mt-4">
         <a href={path}>Open the demo</a>
       </Button>
+
+      <AvailabilityCalendar businessId={businessId} ownerView title="Your calendar" className="mt-8 w-full text-left" />
     </div>
   );
 }

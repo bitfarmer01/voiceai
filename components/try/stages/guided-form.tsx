@@ -9,6 +9,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { ConvexBusinessForAssistant } from "@/lib/vapi/assistant";
 import { OtherWays } from "@/components/try/stages/other-ways";
+import { intakeFor } from "@/convex/lib/intake";
+import type { ServiceIntake } from "@/lib/types";
+import posthog from "posthog-js";
 
 type DraftProfile = {
   companyName: string;
@@ -17,6 +20,7 @@ type DraftProfile = {
   policies: string[];
   availability: string;
   chunks: { text: string; tags: string[] }[];
+  intakeQuestions?: ServiceIntake[];
 };
 
 const MAX_SERVICES = 5;
@@ -70,6 +74,7 @@ export function GuidedForm({
     policies: string[];
     availability: string;
     chunks: { text: string; tags: string[] }[];
+    intakeQuestions?: ServiceIntake[];
   }) => Promise<void>;
   submitLabel?: string;
   submittingLabel?: string;
@@ -92,6 +97,7 @@ export function GuidedForm({
   const [editServices, setEditServices] = React.useState<string[]>([]);
   const [editHours, setEditHours] = React.useState("");
   const [editBooking, setEditBooking] = React.useState("");
+  const [editIntake, setEditIntake] = React.useState<ServiceIntake[]>([]);
   const [submitting, setSubmitting] = React.useState(false);
 
   const suggestFieldA = useAction(api.sources.suggestField);
@@ -175,12 +181,24 @@ export function GuidedForm({
       setEditServices(d.services.length ? d.services : services);
       setEditHours(d.hours);
       setEditBooking(d.availability);
+      setEditIntake(d.intakeQuestions ?? []);
       setPhase("review");
     } catch (e) {
       setError(e instanceof Error ? humanize(e.message) : "Couldn't draft your receptionist — try again.");
       setPhase("seed");
     }
   };
+
+  const removeQuestion = (service: string, id: string) =>
+    setEditIntake((prev) =>
+      prev
+        .map((s) =>
+          s.service.toLowerCase() === service.toLowerCase()
+            ? { ...s, questions: s.questions.filter((q) => q.id !== id) }
+            : s,
+        )
+        .filter((s) => s.questions.length > 0),
+    );
 
   const confirm = async () => {
     if (!draft) return;
@@ -194,6 +212,9 @@ export function GuidedForm({
       policies: draft.policies,
       availability: editBooking.trim(),
       chunks: draft.chunks,
+      intakeQuestions: editIntake.filter((s) =>
+        editServices.some((x) => x.toLowerCase() === s.service.toLowerCase()),
+      ),
     };
 
     // Setup path: persist via the injected saver (e.g. upsertConfigured). The parent
@@ -201,6 +222,7 @@ export function GuidedForm({
     if (onSaveConfig) {
       try {
         await onSaveConfig(profile);
+        posthog.capture("receptionist_created", { channel: "setup", businessType: businessType.trim() });
       } catch {
         setError("Couldn't save your configuration — please try again.");
         setSubmitting(false);
@@ -211,6 +233,7 @@ export function GuidedForm({
     // Default /try path: create the business, then start the call.
     try {
       const { businessId } = await createBizA({ sessionId, ...profile });
+      posthog.capture("receptionist_created", { channel: "try", businessType: businessType.trim() });
       onReady?.({
         _id: businessId,
         name,
@@ -220,6 +243,7 @@ export function GuidedForm({
           services: profile.services,
           policies: profile.policies,
           availability: profile.availability,
+          intakeQuestions: profile.intakeQuestions,
         },
         chunks: profile.chunks.map((c) => ({ text: c.text })),
       });
@@ -414,6 +438,51 @@ export function GuidedForm({
                 ))}
                 <AddChip onAdd={(v) => setEditServices((prev) => (prev.some((x) => x.toLowerCase() === v.toLowerCase()) ? prev : [...prev, v]))} />
               </div>
+            </Field>
+
+            <Field label="Questions it asks before booking">
+              {editServices.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Add a service to see its questions.</p>
+              ) : (
+                <ul className="space-y-3">
+                  {editServices.map((service) => {
+                    const custom = editIntake.some((s) => s.service.toLowerCase() === service.toLowerCase());
+                    return (
+                      <li key={service}>
+                        <p className="text-sm font-medium">
+                          {service}
+                          {!custom && (
+                            <span className="ml-1.5 font-normal text-muted-foreground">— standard question</span>
+                          )}
+                        </p>
+                        <ul className="mt-1 space-y-1">
+                          {intakeFor(editIntake, service).map((q) => (
+                            <li
+                              key={q.id}
+                              className="flex items-start justify-between gap-2 rounded-lg border bg-card px-3 py-2 text-sm"
+                            >
+                              <span className="text-pretty">
+                                {q.prompt}{" "}
+                                <span className="text-muted-foreground">({q.options.join(" / ")})</span>
+                              </span>
+                              {custom && (
+                                <button
+                                  type="button"
+                                  onClick={() => removeQuestion(service, q.id)}
+                                  aria-label={`Remove question: ${q.prompt}`}
+                                  className="text-muted-foreground hover:text-foreground"
+                                >
+                                  <X className="size-3.5" />
+                                </button>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
             </Field>
 
             <Field label="Hours">
